@@ -1,0 +1,28 @@
+{
+  "name": "industrial-control-frontend",
+  "version": "1.0.0",
+  "description": "微型工业现场管控平台前端应用",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite preview --port 8080"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.1.0",
+    "axios": "^1.4.0",
+    "dayjs": "^1.11.9",
+    "echarts": "^5.6.0",
+    "element-plus": "^2.3.8",
+    "pinia": "^2.1.6",
+    "socket.io-client": "^4.7.2",
+    "three": "^0.154.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "sass": "^1.64.1",
+    "vite": "^4.4.0"
+  }
+}
