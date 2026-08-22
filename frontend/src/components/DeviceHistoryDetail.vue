@@ -433,7 +433,7 @@ const updateChart = () => {
       data: yData,
       smooth: chartType.value === 'line',
       itemStyle: {
-        color: '#409EFF'
+        color: '#334EAC'
       },
       markLine: {
         data: [
@@ -554,7 +554,7 @@ const downloadChart = () => {
   const url = chart.value.getDataURL({
     type: 'png',
     pixelRatio: 2,
-    backgroundColor: '#fff'
+    backgroundColor: '#F7F2EB'
   })
   
   const link = document.createElement('a')
@@ -619,7 +619,7 @@ onMounted(() => {
 
 .info-item label {
   display: block;
-  color: #909399;
+  color: #7096D1;
   font-size: 12px;
   margin-bottom: 5px;
 }
@@ -627,7 +627,7 @@ onMounted(() => {
 .info-item span {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: #081F5C;
 }
 
 .stats-section {
@@ -647,13 +647,13 @@ onMounted(() => {
 .stat-number {
   font-size: 20px;
   font-weight: bold;
-  color: #409EFF;
+  color: #334EAC;
   margin-bottom: 5px;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #909399;
+  color: #7096D1;
 }
 
 .chart-section,
@@ -690,47 +690,47 @@ onMounted(() => {
 }
 
 .value-high {
-  color: #F56C6C;
+  color: #081F5C;
   font-weight: bold;
 }
 
 .value-low {
-  color: #E6A23C;
+  color: #7096D1;
   font-weight: bold;
 }
 
 .value-normal {
-  color: #67C23A;
+  color: #7096D1;
 }
 
 .change-up {
-  color: #F56C6C;
+  color: #081F5C;
 }
 
 .change-down {
-  color: #67C23A;
+  color: #7096D1;
 }
 
 .change-none {
-  color: #909399;
+  color: #7096D1;
 }
 
 .anomaly-item {
   padding: 10px;
-  background: #FDF6EC;
+  background: #F7F2EB;
   border-radius: 4px;
-  border-left: 4px solid #E6A23C;
+  border-left: 4px solid #7096D1;
 }
 
 .anomaly-value {
   font-weight: bold;
-  color: #E6A23C;
+  color: #7096D1;
   margin-bottom: 5px;
 }
 
 .anomaly-description {
   font-size: 12px;
-  color: #606266;
+  color: #334EAC;
 }
 
 .more-anomalies {

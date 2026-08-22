@@ -30,3 +30,6 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+
+# Reasonix
+.reasonix/

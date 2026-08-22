@@ -1,7 +1,11 @@
 <template>
   <div class="alarm-management">
     <div class="page-header">
-      <h2>报警管理</h2>      <div class="header-actions">
+      <div>
+        <h2>告警中心</h2>
+        <p>优先处理高风险事件，追踪处置闭环</p>
+      </div>
+      <div class="header-actions">
         <el-button 
           type="primary" 
           :loading="alarmStore.loading"
@@ -9,74 +13,18 @@
         >
           刷新
         </el-button>
-        <el-button 
-          type="warning" 
-          @click="clearAcknowledged"
-        >
-          清除已确认
-        </el-button>
+        <el-button @click="exportAlarms">导出记录</el-button>
       </div>
     </div>
 
-    <!-- 报警统计 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
-        <el-card class="stat-card critical">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStats.critical }}</div>
-            <div class="stat-label">严重报警</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card high">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStats.high }}</div>
-            <div class="stat-label">高级报警</div>
-          </div>
-        </el-card>
-      </el-col>      <el-col :span="6">
-        <el-card class="stat-card medium">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStats.medium }}</div>
-            <div class="stat-label">中级报警</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card warning">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStats.warning }}</div>
-            <div class="stat-label">警告报警</div>
-          </div>        </el-card>
-      </el-col>
-    </el-row>
+    <div class="design-stats alarm-stats">
+      <div class="design-stat-card"><span class="design-stat-icon"><Bell /></span><div><span class="design-stat-label">待处理</span><strong>{{ alarmStore.unreadCount }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">严重</span><strong>{{ alarmStats.critical + alarmStats.high }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">警告</span><strong>{{ alarmStats.medium + alarmStats.warning }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><CircleCheck /></span><div><span class="design-stat-label">今日已关闭</span><strong>{{ closedAlarmCount }}</strong></div></div>
+    </div>
 
-    <!-- 第二行统计 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
-        <el-card class="stat-card unread">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStore.unreadCount }}</div>
-            <div class="stat-label">未确认</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card total">
-          <div class="stat-content">
-            <div class="stat-number">{{ alarmStore.alarms.length }}</div>
-            <div class="stat-label">总报警数</div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <!-- 预留空间 -->
-      </el-col>
-      <el-col :span="6">
-        <!-- 预留空间 -->
-      </el-col>
-    </el-row>
+    <LieflatAlarmInsights :alarms="alarmStore.alarms" />
 
     <!-- 筛选和搜索 -->
     <el-card class="filter-card">
@@ -135,7 +83,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAlarmStore } from '../stores/alarm'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AlarmList from '../components/AlarmList.vue'
-import { Search } from '@element-plus/icons-vue'
+import LieflatAlarmInsights from '../components/LieflatAlarmInsights.vue'
+import { Bell, CircleCheck, Search, Warning } from '@element-plus/icons-vue'
 
 const alarmStore = useAlarmStore()
 const alarmListRef = ref(null)
@@ -157,6 +106,7 @@ const alarmStats = computed(() => {
   
   return stats
 })
+const closedAlarmCount = computed(() => Math.max(0, alarmStore.alarms.length - alarmStore.unreadCount))
 
 // 方法
 async function refreshAlarms() {
@@ -200,6 +150,24 @@ async function clearAcknowledged() {
   }
 }
 
+function exportAlarms() {
+  const rows = [['设备', '级别', '告警信息', '时间', '状态'], ...alarmStore.alarms.map(alarm => [
+    alarm.device_name,
+    alarm.severity,
+    alarm.message,
+    alarm.timestamp,
+    alarm.acknowledged ? '已确认' : '待处理'
+  ])]
+  const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `alarm-records-${new Date().toISOString().slice(0, 10)}.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('告警记录已导出')
+}
+
 // 监听筛选条件变化
 watch([filterSeverity, filterStatus, dateRange, searchText], () => {
   refreshAlarms()
@@ -220,7 +188,7 @@ onMounted(() => {
 
     h2 {
       margin: 0;
-      color: #333;
+      color: #081F5C;
     }
 
     .header-actions {
@@ -245,28 +213,28 @@ onMounted(() => {
 
         .stat-label {
           font-size: 14px;
-          color: #666;
+          color: #334EAC;
         }
       }      &.critical .stat-number {
-        color: #f56c6c;
+        color: #081F5C;
       }
 
       &.high .stat-number {
-        color: #e6a23c;
+        color: #7096D1;
       }
 
       &.medium .stat-number {
-        color: #409eff;
+        color: #334EAC;
       }      &.warning .stat-number {
-        color: #f7ba2a;
+        color: #7096D1;
       }
 
       &.total .stat-number {
-        color: #67c23a;
+        color: #7096D1;
       }
 
       &.unread .stat-number {
-        color: #909399;
+        color: #7096D1;
       }
     }
   }

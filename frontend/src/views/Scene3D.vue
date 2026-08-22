@@ -220,6 +220,51 @@
         </div>
 
       </div>
+
+      <aside class="object-inspector">
+        <div class="inspector-title">对象属性</div>
+        <template v-if="selectedObject">
+          <div class="selected-object-card">
+            <div class="selected-object-icon"><el-icon><Setting /></el-icon></div>
+            <div>
+              <strong>{{ selectedObject.name }}</strong>
+              <span>{{ selectedObject.description || selectedObject.deviceType }}</span>
+            </div>
+            <el-tag size="small">已选择</el-tag>
+          </div>
+
+          <div class="inspector-section">
+            <div class="inspector-label">位置</div>
+            <div class="axis-grid">
+              <span>X {{ Number(selectedObject.mesh?.position?.x ?? selectedObject.position?.x ?? 0).toFixed(2) }}</span>
+              <span>Y {{ Number(selectedObject.mesh?.position?.y ?? selectedObject.position?.y ?? 0).toFixed(2) }}</span>
+              <span>Z {{ Number(selectedObject.mesh?.position?.z ?? selectedObject.position?.z ?? 0).toFixed(2) }}</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <div class="inspector-label">旋转</div>
+            <div class="axis-grid">
+              <span>X {{ Number(selectedObject.mesh?.rotation?.x ?? 0).toFixed(2) }}</span>
+              <span>Y {{ Number(selectedObject.mesh?.rotation?.y ?? 0).toFixed(2) }}</span>
+              <span>Z {{ Number(selectedObject.mesh?.rotation?.z ?? 0).toFixed(2) }}</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <div class="inspector-label">绑定设备</div>
+            <el-button plain class="inspector-action" @click="openDeviceBinding">配置数据绑定</el-button>
+          </div>
+
+          <div class="inspector-section live-state">
+            <div class="inspector-label">实时状态</div>
+            <div class="live-row"><span>运行状态</span><strong>运行中</strong></div>
+            <div class="live-row"><span>对象类型</span><strong>{{ selectedObject.deviceType }}</strong></div>
+            <div class="live-row"><span>创建时间</span><strong>{{ selectedObject.createTime ? new Date(selectedObject.createTime).toLocaleTimeString() : '--' }}</strong></div>
+          </div>
+        </template>
+        <el-empty v-else description="选择场景对象后查看属性" :image-size="64" />
+      </aside>
     </div>
     
     <!-- 底部信息栏 -->
@@ -791,21 +836,21 @@ const sceneObjects = ref([])
 // 设备库数据
 const deviceLibrary = reactive({
   sensors: [
-    { type: 'temperature_sensor', name: '温度传感器', icon: '🌡️', color: '#e74c3c' },
-    { type: 'pressure_sensor', name: '压力传感器', icon: '📊', color: '#3498db' },
-    { type: 'flow_meter', name: '流量计', icon: '💧', color: '#1abc9c' },
+    { type: 'temperature_sensor', name: '温度传感器', icon: '温', color: '#081F5C' },
+    { type: 'pressure_sensor', name: '压力传感器', icon: '压', color: '#334EAC' },
+    { type: 'flow_meter', name: '流量计', icon: '流', color: '#7096D1' },
   ],
   actuators: [
-    { type: 'fan', name: '风扇', icon: '🌀', color: '#9b59b6' },
-    { type: 'servo_motor', name: '伺服电机', icon: '⚙️', color: '#e67e22' },
-    { type: 'indicator_light', name: '指示灯', icon: '💡', color: '#f1c40f' },
-    { type: 'digital_input', name: '数字输入', icon: '📥', color: '#34495e' },
-    { type: 'digital_output', name: '数字输出', icon: '📤', color: '#95a5a6' },
+    { type: 'fan', name: '风扇', icon: '风', color: '#334EAC' },
+    { type: 'servo_motor', name: '伺服电机', icon: '伺', color: '#081F5C' },
+    { type: 'indicator_light', name: '指示灯', icon: '灯', color: '#BAD6EB' },
+    { type: 'digital_input', name: '数字输入', icon: '入', color: '#081F5C' },
+    { type: 'digital_output', name: '数字输出', icon: '出', color: '#7096D1' },
   ],
   structures: [
-    { type: 'pipe', name: '管道', icon: '🔧', color: '#7f8c8d' },
-    { type: 'tank', name: '储罐', icon: '🛢️', color: '#2ecc71' },
-    { type: 'conveyor', name: '传送带', icon: '📦', color: '#e74c3c' },
+    { type: 'pipe', name: '管道', icon: '管', color: '#7096D1' },
+    { type: 'tank', name: '储罐', icon: '罐', color: '#334EAC' },
+    { type: 'conveyor', name: '传送带', icon: '传', color: '#081F5C' },
   ]
 })
 
@@ -843,7 +888,7 @@ const initThreeJS = async () => {
     
     // 创建场景
     scene = new THREE.Scene()
-    scene.background = new THREE.Color('#2c3e50')
+    scene.background = null
     
     // 创建相机
     const containerWidth = threeContainer.value.clientWidth || 800
@@ -859,7 +904,8 @@ const initThreeJS = async () => {
     camera.lookAt(0, 0, 0)
     
     // 创建渲染器
-    renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+    renderer.setClearColor(0x000000, 0)
     renderer.setSize(containerWidth, containerHeight)
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -958,12 +1004,13 @@ const setupLighting = (THREE) => {
 // 设置辅助对象
 const setupHelpers = (THREE) => {
   // 网格
-  gridHelper = new THREE.GridHelper(50, 50)
+  gridHelper = new THREE.GridHelper(50, 50, 0x7096d1, 0xbad6eb)
   gridHelper.visible = showGrid.value
   scene.add(gridHelper)
   
   // 坐标轴
   axesHelper = new THREE.AxesHelper(5)
+  axesHelper.visible = false
   scene.add(axesHelper)
 }
 
@@ -1030,12 +1077,12 @@ const createTemperatureSensor = (THREE) => {
   
   // 主体
   const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1, 8)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xe74c3c })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 传感器探头
   const probeGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.4, 6)
-  const probeMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e })
+  const probeMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const probe = new THREE.Mesh(probeGeometry, probeMaterial)
   probe.position.y = 0.7
   
@@ -1051,12 +1098,12 @@ const createPressureSensor = (THREE) => {
   
   // 主体
   const bodyGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.4)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x7096d1 })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 压力接口
   const portGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.3, 8)
-  const portMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 })
+  const portMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const port = new THREE.Mesh(portGeometry, portMaterial)
   port.position.z = 0.35
   port.rotation.x = Math.PI / 2
@@ -1073,12 +1120,12 @@ const createFlowMeter = (THREE) => {
   
   // 主体环形
   const torusGeometry = new THREE.TorusGeometry(0.6, 0.2, 8, 16)
-  const torusMaterial = new THREE.MeshLambertMaterial({ color: 0x1abc9c })
+  const torusMaterial = new THREE.MeshLambertMaterial({ color: 0x7096d1 })
   const torus = new THREE.Mesh(torusGeometry, torusMaterial)
   
   // 显示屏
   const screenGeometry = new THREE.BoxGeometry(0.4, 0.2, 0.1)
-  const screenMaterial = new THREE.MeshLambertMaterial({ color: 0x2c3e50 })
+  const screenMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const screen = new THREE.Mesh(screenGeometry, screenMaterial)
   screen.position.y = 0.8
   
@@ -1094,12 +1141,12 @@ const createFan = (THREE) => {
   
   // 风扇外壳
   const housingGeometry = new THREE.CylinderGeometry(1, 1, 0.3, 16)
-  const housingMaterial = new THREE.MeshLambertMaterial({ color: 0x9b59b6 })
+  const housingMaterial = new THREE.MeshLambertMaterial({ color: 0xbad6eb })
   const housing = new THREE.Mesh(housingGeometry, housingMaterial)
   
   // 风扇叶片
   const bladeGeometry = new THREE.BoxGeometry(0.1, 1.6, 0.05)
-  const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0x8e44ad })
+  const bladeMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac })
   
   for (let i = 0; i < 4; i++) {
     const blade = new THREE.Mesh(bladeGeometry, bladeMaterial)
@@ -1119,12 +1166,12 @@ const createServoMotor = (THREE) => {
   
   // 电机主体
   const bodyGeometry = new THREE.BoxGeometry(1.2, 0.8, 0.8)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xe67e22 })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 电机轴
   const shaftGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8)
-  const shaftMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e })
+  const shaftMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial)
   shaft.position.x = 0.7
   shaft.rotation.z = Math.PI / 2
@@ -1141,14 +1188,14 @@ const createIndicatorLight = (THREE) => {
   
   // 灯体
   const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 灯泡
   const lightGeometry = new THREE.SphereGeometry(0.25, 16, 16)
   const lightMaterial = new THREE.MeshLambertMaterial({ 
-    color: 0xf1c40f, 
-    emissive: 0x444400,
+    color: 0xbad6eb,
+    emissive: 0x081f5c,
     transparent: true,
     opacity: 0.8
   })
@@ -1166,12 +1213,12 @@ const createDigitalInput = (THREE) => {
   const group = new THREE.Group()
   
   const bodyGeometry = new THREE.BoxGeometry(0.6, 0.3, 0.3)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 输入端口
   const portGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8)
-  const portMaterial = new THREE.MeshLambertMaterial({ color: 0xe74c3c })
+  const portMaterial = new THREE.MeshLambertMaterial({ color: 0x7096d1 })
   
   for (let i = 0; i < 3; i++) {
     const port = new THREE.Mesh(portGeometry, portMaterial)
@@ -1190,12 +1237,12 @@ const createDigitalOutput = (THREE) => {
   const group = new THREE.Group()
   
   const bodyGeometry = new THREE.BoxGeometry(0.6, 0.3, 0.3)
-  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x27ae60 })
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
   
   // 输出端口
   const portGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8)
-  const portMaterial = new THREE.MeshLambertMaterial({ color: 0x2ecc71 })
+  const portMaterial = new THREE.MeshLambertMaterial({ color: 0xbad6eb })
   
   for (let i = 0; i < 3; i++) {
     const port = new THREE.Mesh(portGeometry, portMaterial)
@@ -1212,7 +1259,7 @@ const createDigitalOutput = (THREE) => {
 // 创建管道模型
 const createPipe = (THREE) => {
   const geometry = new THREE.CylinderGeometry(0.2, 0.2, 5, 16)
-  const material = new THREE.MeshLambertMaterial({ color: 0x7f8c8d })
+  const material = new THREE.MeshLambertMaterial({ color: 0x7096d1 })
   const pipe = new THREE.Mesh(geometry, material)
   pipe.rotation.z = Math.PI / 2
   
@@ -1225,12 +1272,12 @@ const createTank = (THREE) => {
   
   // 罐体
   const tankGeometry = new THREE.CylinderGeometry(2, 2, 3, 16)
-  const tankMaterial = new THREE.MeshLambertMaterial({ color: 0x2ecc71, transparent: true, opacity: 0.8 })
+  const tankMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac, transparent: true, opacity: 0.8 })
   const tank = new THREE.Mesh(tankGeometry, tankMaterial)
   
   // 液位指示
   const liquidGeometry = new THREE.CylinderGeometry(1.9, 1.9, 1.8, 16)
-  const liquidMaterial = new THREE.MeshLambertMaterial({ color: 0x3498db, transparent: true, opacity: 0.6 })
+  const liquidMaterial = new THREE.MeshLambertMaterial({ color: 0xbad6eb, transparent: true, opacity: 0.6 })
   const liquid = new THREE.Mesh(liquidGeometry, liquidMaterial)
   liquid.position.y = -0.6
   
@@ -1246,12 +1293,12 @@ const createConveyor = (THREE) => {
   
   // 传送带主体
   const beltGeometry = new THREE.BoxGeometry(5, 0.2, 1)
-  const beltMaterial = new THREE.MeshLambertMaterial({ color: 0xe74c3c })
+  const beltMaterial = new THREE.MeshLambertMaterial({ color: 0x334eac })
   const belt = new THREE.Mesh(beltGeometry, beltMaterial)
   
   // 滚筒
   const drumGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8)
-  const drumMaterial = new THREE.MeshLambertMaterial({ color: 0x34495e })
+  const drumMaterial = new THREE.MeshLambertMaterial({ color: 0x081f5c })
   
   const drum1 = new THREE.Mesh(drumGeometry, drumMaterial)
   drum1.position.x = -2.4
@@ -1273,7 +1320,7 @@ const createConveyor = (THREE) => {
 // 创建默认设备模型
 const createDefaultDevice = (THREE) => {
   const geometry = new THREE.BoxGeometry(1, 1, 1)
-  const material = new THREE.MeshLambertMaterial({ color: 0x95a5a6 })
+  const material = new THREE.MeshLambertMaterial({ color: 0x7096d1 })
   return new THREE.Mesh(geometry, material)
 }
 
@@ -2612,7 +2659,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f5f5f5;
+  background: #F7F2EB;
 }
 
 .toolbar {
@@ -2621,7 +2668,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 12px 20px;
   background: white;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #BAD6EB;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   flex-wrap: wrap;
   gap: 15px;
@@ -2664,7 +2711,7 @@ onUnmounted(() => {
 .device-library {
   width: 280px;
   background: white;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid #BAD6EB;
   overflow-y: auto;
 }
 
@@ -2693,7 +2740,7 @@ onUnmounted(() => {
   display: flex;
   flex: 1;
   overflow: hidden;
-  background: #f8f9fa;
+  background: #F7F2EB;
 }
 
 .device-item {
@@ -2701,15 +2748,15 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   padding: 12px 8px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid #BAD6EB;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
-  background: #fafafa;
+  background: #F7F2EB;
 }
 
 .device-item:hover {
-  border-color: #409eff;
+  border-color: #334EAC;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
 }
@@ -2729,20 +2776,25 @@ onUnmounted(() => {
 .device-name {
   font-size: 12px;
   text-align: center;
-  color: #606266;
+  color: #334EAC;
   font-weight: 500;
 }
 
 .scene-viewport {
   flex: 1;
   position: relative;
-  background: #2c3e50;
+  background-color: #e8edf0;
 }
 
 .three-container {
   width: 100%;
   height: 100%;
   cursor: crosshair;
+}
+
+.three-container :deep(canvas) {
+  opacity: .42;
+  mix-blend-mode: multiply;
 }
 
 .viewport-controls {
@@ -2776,17 +2828,17 @@ onUnmounted(() => {
 }
 
 .device-item-data {
-  border: 1px solid #e0e0e0;
+  border: 1px solid #BAD6EB;
   border-radius: 6px;
   padding: 12px;
   margin-bottom: 12px;
-  background: #fafafa;
+  background: #F7F2EB;
   transition: all 0.3s ease;
 }
 
 .device-item-data:hover {
-  background: #f0f9ff;
-  border-color: #409eff;
+  background: #F7F2EB;
+  border-color: #334EAC;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
 }
 
@@ -2796,12 +2848,12 @@ onUnmounted(() => {
   align-items: center;
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #BAD6EB;
 }
 
 .device-name {
   font-weight: 600;
-  color: #303133;
+  color: #081F5C;
   font-size: 14px;
 }
 
@@ -2818,7 +2870,7 @@ onUnmounted(() => {
 }
 
 .parameter-name {
-  color: #606266;
+  color: #334EAC;
   font-weight: 500;
 }
 
@@ -2828,29 +2880,29 @@ onUnmounted(() => {
 }
 
 .parameter-value.value-normal {
-  color: #67c23a;
+  color: #7096D1;
 }
 
 .parameter-value.value-warning {
-  color: #e6a23c;
+  color: #7096D1;
 }
 
 .parameter-value.value-danger {
-  color: #f56c6c;
+  color: #081F5C;
 }
 
 .device-time {
   font-size: 10px;
-  color: #909399;
+  color: #7096D1;
   text-align: right;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid #BAD6EB;
   padding-top: 4px;
   margin-top: 6px;
 }
 
 .no-devices {
   text-align: center;
-  color: #909399;
+  color: #7096D1;
   padding: 40px 20px;
   font-size: 14px;
 }
@@ -2860,7 +2912,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  background: #34495e;
+  background: #081F5C;
   color: white;
   font-size: 12px;
 }
@@ -2940,8 +2992,8 @@ onUnmounted(() => {
 
 /* 选中状态 */
 .device-item.selected {
-  border-color: #409eff;
-  background: #ecf5ff;
+  border-color: #334EAC;
+  background: #F7F2EB;
 }
 
 /* 工具提示 */
@@ -2955,12 +3007,12 @@ onUnmounted(() => {
 }
 
 .device-library::-webkit-scrollbar-thumb {
-  background: #c0c4cc;
+  background: #BAD6EB;
   border-radius: 3px;
 }
 
 .device-library::-webkit-scrollbar-thumb:hover {
-  background: #909399;
+  background: #7096D1;
 }
 
 /* 设备悬停提示样式 */
@@ -2972,7 +3024,7 @@ onUnmounted(() => {
 .context-menu {
   position: fixed;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e4e7ed;
+  border: 1px solid #BAD6EB;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10000;
@@ -2984,9 +3036,9 @@ onUnmounted(() => {
   padding: 12px 16px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #606266;
+  color: #334EAC;
   font-size: 14px;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid #F7F2EB;
 }
 
 .menu-item:last-child {
@@ -2994,21 +3046,21 @@ onUnmounted(() => {
 }
 
 .menu-item:hover {
-  background: #ecf5ff;
-  color: #409eff;
+  background: #F7F2EB;
+  color: #334EAC;
 }
 
 .menu-item:active {
-  background: #d9ecff;
+  background: #BAD6EB;
 }
 
 .menu-item.danger {
-  color: #f56c6c;
+  color: #081F5C;
 }
 
 .menu-item.danger:hover {
-  background: #fef0f0;
-  color: #f56c6c;
+  background: #F7F2EB;
+  color: #081F5C;
 }
 
 .device-option {
@@ -3017,13 +3069,13 @@ onUnmounted(() => {
 
 .device-name {
   font-weight: 500;
-  color: #303133;
+  color: #081F5C;
   margin-bottom: 2px;
 }
 
 .device-info {
   font-size: 12px;
-  color: #909399;
+  color: #7096D1;
 }
 
 /* 设备数据覆盖面板样式 */
@@ -3034,7 +3086,7 @@ onUnmounted(() => {
   width: 320px;
   max-height: 70vh;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e0e0e0;
+  border: 1px solid #BAD6EB;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -3044,12 +3096,12 @@ onUnmounted(() => {
 }
 
 .overlay-header {
-  background: linear-gradient(135deg, #409eff, #67c23a);
+  background: #334EAC;
   color: white;
   padding: 12px 16px;
   font-weight: 600;
   font-size: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #BAD6EB;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3078,7 +3130,7 @@ onUnmounted(() => {
 
 .device-card {
   margin-bottom: 12px;
-  border: 1px solid #e8f4f8;
+  border: 1px solid #F7F2EB;
   border-radius: 6px;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -3086,20 +3138,20 @@ onUnmounted(() => {
 }
 
 .device-card:hover {
-  border-color: #409eff;
+  border-color: #334EAC;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
   transform: translateY(-1px);
 }
 
 .device-card.selected {
-  border-color: #409eff;
+  border-color: #334EAC;
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
 .device-header {
-  background: #f8fafc;
+  background: #F7F2EB;
   padding: 10px 12px;
-  border-bottom: 1px solid #e8f4f8;
+  border-bottom: 1px solid #F7F2EB;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3107,7 +3159,7 @@ onUnmounted(() => {
 
 .device-name {
   font-weight: 600;
-  color: #2c3e50;
+  color: #081F5C;
   font-size: 14px;
 }
 
@@ -3120,27 +3172,27 @@ onUnmounted(() => {
 }
 
 .status-normal {
-  background: #f0f9ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: #F7F2EB;
+  color: #081F5C;
+  border: 1px solid #BAD6EB;
 }
 
 .status-warning {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fed7aa;
+  background: #F7F2EB;
+  color: #7096D1;
+  border: 1px solid #BAD6EB;
 }
 
 .status-error {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #F7F2EB;
+  color: #081F5C;
+  border: 1px solid #BAD6EB;
 }
 
 .status-offline {
-  background: #f8fafc;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
+  background: #F7F2EB;
+  color: #334EAC;
+  border: 1px solid #BAD6EB;
 }
 
 .device-data {
@@ -3152,7 +3204,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F7F2EB;
 }
 
 .data-row:last-child {
@@ -3160,34 +3212,34 @@ onUnmounted(() => {
 }
 
 .data-label {
-  color: #64748b;
+  color: #334EAC;
   font-size: 12px;
   font-weight: 500;
 }
 
 .data-value {
-  color: #1e293b;
+  color: #081F5C;
   font-weight: 600;
   font-size: 13px;
 }
 
 .data-value.anomaly {
-  color: #dc2626;
+  color: #081F5C;
   animation: pulse 2s infinite;
 }
 
 .data-timestamp {
-  color: #94a3b8;
+  color: #7096D1;
   font-size: 11px;
   margin-top: 8px;
   text-align: center;
   padding-top: 8px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #F7F2EB;
 }
 
 .no-data {
   text-align: center;
-  color: #94a3b8;
+  color: #7096D1;
   padding: 24px;
   font-style: italic;
 }
@@ -3203,17 +3255,17 @@ onUnmounted(() => {
 }
 
 .overlay-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #F7F2EB;
   border-radius: 3px;
 }
 
 .overlay-content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #BAD6EB;
   border-radius: 3px;
 }
 
 .overlay-content::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #7096D1;
 }
 
 /* 设备数据覆盖面板样式 */
@@ -3224,7 +3276,7 @@ onUnmounted(() => {
   width: 320px;
   max-height: 70vh;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e0e0e0;
+  border: 1px solid #BAD6EB;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -3234,12 +3286,12 @@ onUnmounted(() => {
 }
 
 .overlay-header {
-  background: linear-gradient(135deg, #409eff, #67c23a);
+  background: #334EAC;
   color: white;
   padding: 12px 16px;
   font-weight: 600;
   font-size: 16px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #BAD6EB;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3268,7 +3320,7 @@ onUnmounted(() => {
 
 .device-card {
   margin-bottom: 12px;
-  border: 1px solid #e8f4f8;
+  border: 1px solid #F7F2EB;
   border-radius: 6px;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -3276,20 +3328,20 @@ onUnmounted(() => {
 }
 
 .device-card:hover {
-  border-color: #409eff;
+  border-color: #334EAC;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
   transform: translateY(-1px);
 }
 
 .device-card.selected {
-  border-color: #409eff;
+  border-color: #334EAC;
   box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
 }
 
 .device-header {
-  background: #f8fafc;
+  background: #F7F2EB;
   padding: 10px 12px;
-  border-bottom: 1px solid #e8f4f8;
+  border-bottom: 1px solid #F7F2EB;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -3297,7 +3349,7 @@ onUnmounted(() => {
 
 .device-name {
   font-weight: 600;
-  color: #2c3e50;
+  color: #081F5C;
   font-size: 14px;
 }
 
@@ -3310,27 +3362,27 @@ onUnmounted(() => {
 }
 
 .status-normal {
-  background: #f0f9ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  background: #F7F2EB;
+  color: #081F5C;
+  border: 1px solid #BAD6EB;
 }
 
 .status-warning {
-  background: #fffbeb;
-  color: #b45309;
-  border: 1px solid #fed7aa;
+  background: #F7F2EB;
+  color: #7096D1;
+  border: 1px solid #BAD6EB;
 }
 
 .status-error {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #F7F2EB;
+  color: #081F5C;
+  border: 1px solid #BAD6EB;
 }
 
 .status-offline {
-  background: #f8fafc;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
+  background: #F7F2EB;
+  color: #334EAC;
+  border: 1px solid #BAD6EB;
 }
 
 .device-data {
@@ -3342,7 +3394,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #F7F2EB;
 }
 
 .data-row:last-child {
@@ -3350,34 +3402,34 @@ onUnmounted(() => {
 }
 
 .data-label {
-  color: #64748b;
+  color: #334EAC;
   font-size: 12px;
   font-weight: 500;
 }
 
 .data-value {
-  color: #1e293b;
+  color: #081F5C;
   font-weight: 600;
   font-size: 13px;
 }
 
 .data-value.anomaly {
-  color: #dc2626;
+  color: #081F5C;
   animation: pulse 2s infinite;
 }
 
 .data-timestamp {
-  color: #94a3b8;
+  color: #7096D1;
   font-size: 11px;
   margin-top: 8px;
   text-align: center;
   padding-top: 8px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #F7F2EB;
 }
 
 .no-data {
   text-align: center;
-  color: #94a3b8;
+  color: #7096D1;
   padding: 24px;
   font-style: italic;
 }
@@ -3393,16 +3445,16 @@ onUnmounted(() => {
 }
 
 .overlay-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #F7F2EB;
   border-radius: 3px;
 }
 
 .overlay-content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #BAD6EB;
   border-radius: 3px;
 }
 
 .overlay-content::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: #7096D1;
 }
 </style>

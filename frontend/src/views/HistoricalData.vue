@@ -2,7 +2,10 @@
   <div class="historical-data-view">
     <!-- 页面标题和控制 -->
     <div class="page-header">
-      <h2>历史数据分析</h2>
+      <div>
+        <h2>历史数据</h2>
+        <p>查询、对比并导出设备运行记录</p>
+      </div>
       <div class="header-controls">
         <el-date-picker
           v-model="dateRange"
@@ -14,6 +17,9 @@
           value-format="YYYY-MM-DD HH:mm:ss"
           @change="loadHistoricalData"
         />
+        <el-select v-model="selectedHistoryDevice" placeholder="全部设备" clearable style="width: 150px">
+          <el-option v-for="name in historyDeviceNames" :key="name" :label="getDeviceDisplayName(name)" :value="name" />
+        </el-select>
         <el-button type="primary" @click="loadHistoricalData" :loading="loading">
           刷新数据
         </el-button>
@@ -24,67 +30,15 @@
       </div>
     </div>
 
-    <!-- 数据统计卡片 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon total">
-              <el-icon><DataBoard /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ formatNumber(totalRecords) }}</div>
-              <div class="stat-label">总记录数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon devices">
-              <el-icon><Platform /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ deviceCount }}</div>
-              <div class="stat-label">设备数量</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon time">
-              <el-icon><Clock /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ timeSpan }}</div>
-              <div class="stat-label">时间跨度</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon anomaly">
-              <el-icon><Warning /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ anomalyCount }}</div>
-              <div class="stat-label">异常记录</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="design-stats">
+      <div class="design-stat-card"><span class="design-stat-icon"><DataBoard /></span><div><span class="design-stat-label">总记录数</span><strong>{{ formatNumber(totalRecords) }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Platform /></span><div><span class="design-stat-label">设备数量</span><strong>{{ deviceCount }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Clock /></span><div><span class="design-stat-label">时间跨度</span><strong>{{ timeSpan }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">异常记录</span><strong>{{ anomalyCount }}</strong></div></div>
+    </div>
 
     <!-- 设备分类展示 -->
-    <div class="device-categories">
+    <div v-if="false" class="device-categories">
       <!-- 传感器类数据 -->
       <el-card class="category-card">
         <template #header>
@@ -257,6 +211,69 @@
       </el-card>
     </div>
 
+    <LieflatHistoryOverview :rows="historyRows" />
+
+    <el-card class="history-records-card">
+      <template #header>
+        <div class="card-header">
+          <div class="history-tabs" role="tablist" aria-label="历史数据视图">
+            <button
+              v-for="tab in historyTabs"
+              :key="tab.value"
+              type="button"
+              role="tab"
+              class="history-tab"
+              :class="{ active: activeHistoryTab === tab.value }"
+              :aria-selected="activeHistoryTab === tab.value"
+              @click="activeHistoryTab = tab.value"
+            >{{ tab.label }}</button>
+          </div>
+          <small>{{ activeHistoryDescription }}</small>
+        </div>
+      </template>
+      <div class="history-table-wrap">
+        <el-table v-if="activeHistoryTab === 'raw'" :data="historyRows" v-loading="loading" height="100%" empty-text="当前条件下暂无原始记录">
+          <el-table-column prop="timestamp" label="时间" min-width="170">
+            <template #default="{ row }">{{ formatHistoryTime(row.timestamp) }}</template>
+          </el-table-column>
+          <el-table-column prop="name" label="设备" min-width="150">
+            <template #default="{ row }">{{ getDeviceDisplayName(row.name) }}</template>
+          </el-table-column>
+          <el-table-column prop="type" label="类型" min-width="100" />
+          <el-table-column prop="value" label="数值" min-width="100">
+            <template #default="{ row }"><strong>{{ formatValue(row.value) }}</strong></template>
+          </el-table-column>
+          <el-table-column prop="unit" label="单位" min-width="80" />
+          <el-table-column label="质量" min-width="90"><template #default><el-tag size="small">良好</el-tag></template></el-table-column>
+          <el-table-column label="状态" min-width="90"><template #default><span class="status-indicator online"></span> 正常</template></el-table-column>
+          <el-table-column label="操作" width="80"><template #default="{ row }"><el-button text @click="showDeviceDetail(row.device)">详情</el-button></template></el-table-column>
+        </el-table>
+
+        <el-table v-else-if="activeHistoryTab === 'summary'" :data="historySummaryRows" v-loading="loading" height="100%" empty-text="当前条件下暂无统计数据">
+          <el-table-column prop="name" label="设备" min-width="160"><template #default="{ row }">{{ getDeviceDisplayName(row.name) }}</template></el-table-column>
+          <el-table-column prop="type" label="类型" min-width="100" />
+          <el-table-column prop="count" label="记录数" min-width="90" />
+          <el-table-column prop="average" label="平均值" min-width="105"><template #default="{ row }"><strong>{{ formatValue(row.average) }}</strong></template></el-table-column>
+          <el-table-column prop="minimum" label="最小值" min-width="100"><template #default="{ row }">{{ formatValue(row.minimum) }}</template></el-table-column>
+          <el-table-column prop="maximum" label="最大值" min-width="100"><template #default="{ row }">{{ formatValue(row.maximum) }}</template></el-table-column>
+          <el-table-column prop="latest" label="最新值" min-width="100"><template #default="{ row }">{{ formatValue(row.latest) }}</template></el-table-column>
+          <el-table-column prop="unit" label="单位" min-width="80" />
+          <el-table-column label="操作" width="80"><template #default="{ row }"><el-button text @click="showDeviceDetail(row.device)">详情</el-button></template></el-table-column>
+        </el-table>
+
+        <el-table v-else :data="historyAnomalyRows" v-loading="loading" height="100%" empty-text="当前条件下未发现异常记录">
+          <el-table-column prop="timestamp" label="时间" min-width="170"><template #default="{ row }">{{ formatHistoryTime(row.timestamp) }}</template></el-table-column>
+          <el-table-column prop="name" label="设备" min-width="150"><template #default="{ row }">{{ getDeviceDisplayName(row.name) }}</template></el-table-column>
+          <el-table-column prop="value" label="异常值" min-width="100"><template #default="{ row }"><strong>{{ formatValue(row.value) }} {{ row.unit }}</strong></template></el-table-column>
+          <el-table-column prop="average" label="设备均值" min-width="110"><template #default="{ row }">{{ formatValue(row.average) }} {{ row.unit }}</template></el-table-column>
+          <el-table-column prop="deviation" label="偏离幅度" min-width="110"><template #default="{ row }">{{ formatValue(row.deviation) }} {{ row.unit }}</template></el-table-column>
+          <el-table-column prop="score" label="异常指数" min-width="100"><template #default="{ row }"><el-tag size="small">{{ row.score.toFixed(1) }}</el-tag></template></el-table-column>
+          <el-table-column label="状态" min-width="100"><template #default><strong>需要关注</strong></template></el-table-column>
+          <el-table-column label="操作" width="80"><template #default="{ row }"><el-button text @click="showDeviceDetail(row.device)">详情</el-button></template></el-table-column>
+        </el-table>
+      </div>
+    </el-card>
+
     <!-- 设备详情对话框 -->
     <el-dialog
       v-model="showDetailDialog"
@@ -279,6 +296,7 @@ import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { historicalAPI, deviceAPI } from '../api'
 import DeviceHistoryDetail from '../components/DeviceHistoryDetail.vue'
+import LieflatHistoryOverview from '../components/LieflatHistoryOverview.vue'
 import {
   DataBoard,
   Platform,
@@ -294,9 +312,16 @@ import {
 // 响应式数据
 const loading = ref(false)
 const dateRange = ref([])
+const selectedHistoryDevice = ref('')
 const historicalData = ref([])
 const showDetailDialog = ref(false)
 const currentDevice = ref(null)
+const activeHistoryTab = ref('raw')
+const historyTabs = [
+  { label: '原始记录', value: 'raw' },
+  { label: '统计汇总', value: 'summary' },
+  { label: '异常记录', value: 'anomaly' }
+]
 
 // 统计数据
 const totalRecords = ref(0)
@@ -320,6 +345,57 @@ const deviceCategories = computed(() => ({
   indicator: indicatorDevices.value,
   io: ioDevices.value
 }))
+
+const historyDeviceNames = computed(() => historicalData.value.map(device => device.name).filter(Boolean))
+const filteredHistoricalDevices = computed(() => historicalData.value
+  .filter(device => !selectedHistoryDevice.value || device.name === selectedHistoryDevice.value)
+)
+const allHistoryRows = computed(() => filteredHistoricalDevices.value
+  .flatMap(device => (device.timestamps || []).map((timestamp, index) => ({
+    timestamp,
+    name: device.name,
+    type: device.type || '设备',
+    value: device.values?.[index],
+    unit: device.unit || '',
+    device
+  })))
+  .filter(row => row.timestamp && typeof row.value === 'number')
+  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)))
+const historyRows = computed(() => allHistoryRows.value.slice(0, 100))
+const historySummaryRows = computed(() => filteredHistoricalDevices.value.map(device => {
+  const values = (device.values || []).map(Number).filter(Number.isFinite)
+  const latestIndex = Math.max(0, values.length - 1)
+  return {
+    name: device.name,
+    type: device.type || '设备',
+    count: values.length,
+    average: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0,
+    minimum: values.length ? Math.min(...values) : 0,
+    maximum: values.length ? Math.max(...values) : 0,
+    latest: values[latestIndex] ?? 0,
+    unit: device.unit || '',
+    device
+  }
+}).filter(row => row.count > 0))
+const historyAnomalyRows = computed(() => {
+  const candidates = historySummaryRows.value.flatMap(summary => {
+    const rows = allHistoryRows.value.filter(row => row.name === summary.name)
+    const variance = rows.length ? rows.reduce((sum, row) => sum + (row.value - summary.average) ** 2, 0) / rows.length : 0
+    const deviationScale = Math.sqrt(variance) || 1
+    return rows.map(row => ({
+      ...row,
+      average: summary.average,
+      deviation: Math.abs(row.value - summary.average),
+      score: Math.abs(row.value - summary.average) / deviationScale
+    }))
+  }).sort((a, b) => b.score - a.score)
+  return candidates.slice(0, Math.max(1, Math.round(candidates.length * .05)))
+})
+const activeHistoryDescription = computed(() => ({
+  raw: `${allHistoryRows.value.length} 条当前查询记录 · 数据按时间倒序`,
+  summary: `${historySummaryRows.value.length} 台设备 · 汇总当前时间范围`,
+  anomaly: `${historyAnomalyRows.value.length} 条异常记录 · 按异常指数排序`
+}[activeHistoryTab.value]))
 
 // 方法
 function getDeviceDisplayName(deviceName) {
@@ -404,6 +480,11 @@ function formatNumber(num) {
 function formatValue(value) {
   if (typeof value !== 'number') return '--'
   return value.toFixed(2)
+}
+
+function formatHistoryTime(timestamp) {
+  if (!timestamp) return '--'
+  return new Date(timestamp).toLocaleString('zh-CN', { hour12: false })
 }
 
 async function loadHistoricalData() {
@@ -631,7 +712,7 @@ function renderMiniCharts() {
               type: 'line',
               symbol: 'none',
               lineStyle: {
-                color: device.name.includes('sensor') ? '#409EFF' : '#67C23A',
+                color: device.name.includes('sensor') ? '#334EAC' : '#7096D1',
                 width: 2
               },
               data: device.values.slice(-20)
@@ -690,6 +771,28 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .historical-data-view {
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+
+    > div:first-child { display: flex; align-items: baseline; gap: 20px; }
+    > div:first-child p { margin: 0; }
+    .header-controls { width: 100%; margin-top: 12px; }
+    .header-controls .el-button:first-of-type { margin-left: auto; }
+  }
+
+  .history-tabs { display: flex; align-items: center; gap: 24px; }
+  .history-tab { position: relative; min-height: 36px; padding: 0 2px; color: rgba(8, 31, 92, .58); background: transparent; border: 0; cursor: pointer; font-size: 14px; font-weight: 700; }
+  .history-tab::after { position: absolute; right: 0; bottom: -12px; left: 0; height: 2px; background: transparent; content: ''; }
+  .history-tab:hover, .history-tab:focus-visible, .history-tab.active { color: #334eac; }
+  .history-tab.active::after { background: #334eac; }
+  .history-tab:focus-visible { outline: 2px solid rgba(51, 78, 172, .35); outline-offset: 3px; }
+  .history-records-card :deep(.el-card__header) { padding-block: 12px; }
+  .history-records-card :deep(.el-card__body) { padding: 0 16px 12px; }
+  .history-table-wrap { height: clamp(300px, calc(100vh - 660px), 440px); }
+  .history-records-card :deep(.el-table th.el-table__cell) { height: 46px; padding: 4px 0; }
+  .history-records-card :deep(.el-table td.el-table__cell) { height: 48px; padding: 4px 0; }
   padding: 20px;
 
   .page-header {
@@ -700,7 +803,7 @@ onMounted(() => {
 
     h2 {
       margin: 0;
-      color: #303133;
+      color: #081F5C;
     }
 
     .header-controls {
@@ -729,23 +832,23 @@ onMounted(() => {
           font-size: 24px;
 
           &.total {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #334EAC;
             color: white;
           }
 
           &.devices {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #081F5C;
             color: white;
           }
 
           &.time {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            background: #7096D1;
             color: white;
           }
 
           &.anomaly {
-            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            color: #e67e22;
+            background: #BAD6EB;
+            color: #081F5C;
           }
         }
 
@@ -753,13 +856,13 @@ onMounted(() => {
           .stat-number {
             font-size: 28px;
             font-weight: bold;
-            color: #303133;
+            color: #081F5C;
             line-height: 1;
           }
 
           .stat-label {
             font-size: 14px;
-            color: #909399;
+            color: #7096D1;
             margin-top: 5px;
           }
         }
@@ -787,26 +890,26 @@ onMounted(() => {
             font-size: 20px;
 
             &.sensors {
-              color: #409EFF;
+              color: #334EAC;
             }
 
             &.actuators {
-              color: #67C23A;
+              color: #7096D1;
             }
 
             &.indicators {
-              color: #E6A23C;
+              color: #7096D1;
             }
 
             &.io {
-              color: #F56C6C;
+              color: #081F5C;
             }
           }
         }
       }
 
       .device-card {
-        border: 1px solid #e4e7ed;
+        border: 1px solid #BAD6EB;
         border-radius: 8px;
         padding: 15px;
         cursor: pointer;
@@ -821,11 +924,11 @@ onMounted(() => {
         }
 
         &.sensor-card {
-          border-left: 4px solid #409EFF;
+          border-left: 4px solid #334EAC;
         }
 
         &.actuator-card {
-          border-left: 4px solid #67C23A;
+          border-left: 4px solid #7096D1;
         }
 
         .device-header {
@@ -836,7 +939,7 @@ onMounted(() => {
 
           .device-name {
             font-weight: 600;
-            color: #303133;
+            color: #081F5C;
           }
         }
 
@@ -852,12 +955,12 @@ onMounted(() => {
             font-size: 14px;
 
             .label {
-              color: #909399;
+              color: #7096D1;
             }
 
             .value {
               font-weight: 500;
-              color: #303133;
+              color: #081F5C;
             }
           }
         }
@@ -873,16 +976,16 @@ onMounted(() => {
         }
       }      .indicator-item,
       .io-item {
-        border: 1px solid #e4e7ed;
+        border: 1px solid #BAD6EB;
         border-radius: 8px;
         padding: 20px;
         margin-bottom: 15px;
         transition: all 0.3s ease;
         cursor: pointer;
-        background: #fff;
+        background: #F7F2EB;
 
         &:hover {
-          border-color: #409eff;
+          border-color: #334EAC;
           box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
           transform: translateY(-2px);
         }
@@ -910,7 +1013,7 @@ onMounted(() => {
 
               .device-name {
                 font-weight: 600;
-                color: #303133;
+                color: #081F5C;
                 font-size: 14px;
                 line-height: 1.4;
               }
@@ -924,25 +1027,25 @@ onMounted(() => {
                   width: 14px;
                   height: 14px;
                   border-radius: 50%;
-                  border: 2px solid #fff;
+                  border: 2px solid #F7F2EB;
                   box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 
                   &.light-off {
-                    background: #c0c4cc;
+                    background: #BAD6EB;
                   }
 
                   &.light-green {
-                    background: #67c23a;
+                    background: #7096D1;
                     box-shadow: 0 0 12px rgba(103, 194, 58, 0.4);
                   }
 
                   &.light-yellow {
-                    background: #e6a23c;
+                    background: #7096D1;
                     box-shadow: 0 0 12px rgba(230, 162, 60, 0.4);
                   }
 
                   &.light-red {
-                    background: #f56c6c;
+                    background: #081F5C;
                     box-shadow: 0 0 12px rgba(245, 108, 108, 0.4);
                   }
                 }
@@ -950,7 +1053,7 @@ onMounted(() => {
                 .status-text {
                   font-size: 12px;
                   font-weight: 500;
-                  color: #606266;
+                  color: #334EAC;
                 }
               }
             }
@@ -973,7 +1076,7 @@ onMounted(() => {
 
                   .label {
                     font-size: 13px;
-                    color: #909399;
+                    color: #7096D1;
                   }
 
                   .value {
@@ -981,19 +1084,19 @@ onMounted(() => {
                     font-weight: 600;
                     
                     &.status-off {
-                      color: #c0c4cc;
+                      color: #BAD6EB;
                     }
                     
                     &.status-normal {
-                      color: #67c23a;
+                      color: #7096D1;
                     }
                     
                     &.status-warning {
-                      color: #e6a23c;
+                      color: #7096D1;
                     }
                     
                     &.status-error {
-                      color: #f56c6c;
+                      color: #081F5C;
                     }
                   }
                 }
@@ -1021,7 +1124,7 @@ onMounted(() => {
 
               .device-name {
                 font-weight: 600;
-                color: #303133;
+                color: #081F5C;
                 font-size: 14px;
               }
             }
@@ -1046,17 +1149,17 @@ onMounted(() => {
                     width: 16px;
                     height: 16px;
                     border-radius: 50%;
-                    border: 2px solid #fff;
+                    border: 2px solid #F7F2EB;
                     box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
                     transition: all 0.3s ease;
 
                     &.status-active {
-                      background: #67c23a;
+                      background: #7096D1;
                       box-shadow: 0 0 12px rgba(103, 194, 58, 0.4), 0 0 0 1px rgba(0,0,0,0.1);
                     }
 
                     &.status-inactive {
-                      background: #c0c4cc;
+                      background: #BAD6EB;
                       box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
                     }
                   }
@@ -1065,7 +1168,7 @@ onMounted(() => {
                 .status-label {
                   font-size: 14px;
                   font-weight: 600;
-                  color: #303133;
+                  color: #081F5C;
                 }
               }
 
@@ -1082,20 +1185,20 @@ onMounted(() => {
 
                   .label {
                     font-size: 12px;
-                    color: #909399;
+                    color: #7096D1;
                   }
 
                   .value {
                     font-size: 12px;
                     font-weight: 600;
-                    color: #303133;
+                    color: #081F5C;
 
                     &.digital-value {
                       font-family: 'Courier New', monospace;
-                      background: #f5f7fa;
+                      background: #F7F2EB;
                       padding: 2px 6px;
                       border-radius: 4px;
-                      border: 1px solid #e4e7ed;
+                      border: 1px solid #BAD6EB;
                     }
                   }
                 }
@@ -1112,7 +1215,7 @@ onMounted(() => {
         justify-content: space-between;
         align-items: center;
         padding: 15px;
-        border: 1px solid #e4e7ed;
+        border: 1px solid #BAD6EB;
         border-radius: 6px;
         margin-bottom: 10px;
 
@@ -1124,7 +1227,7 @@ onMounted(() => {
 
           .device-name {
             font-weight: 500;
-            color: #303133;
+            color: #081F5C;
           }
 
           .indicator-status {
@@ -1138,21 +1241,21 @@ onMounted(() => {
               border-radius: 50%;
 
               &.light-off {
-                background: #c0c4cc;
+                background: #BAD6EB;
               }
 
               &.light-green {
-                background: #67c23a;
+                background: #7096D1;
                 box-shadow: 0 0 8px rgba(103, 194, 58, 0.5);
               }
 
               &.light-yellow {
-                background: #e6a23c;
+                background: #7096D1;
                 box-shadow: 0 0 8px rgba(230, 162, 60, 0.5);
               }
 
               &.light-red {
-                background: #f56c6c;
+                background: #081F5C;
                 box-shadow: 0 0 8px rgba(245, 108, 108, 0.5);
               }
             }
@@ -1168,7 +1271,7 @@ onMounted(() => {
         .indicator-stats,
         .io-stats {
           font-size: 14px;
-          color: #909399;
+          color: #7096D1;
         }
       }
     }

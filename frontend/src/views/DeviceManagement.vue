@@ -1,119 +1,45 @@
 <template>
   <div class="device-management">
-    <!-- 页面标题和操作 -->
     <div class="page-header">
-      <h2>设备管理</h2>
+      <div>
+        <h2>设备管理</h2>
+        <p>统一管理现场设备、连接状态与维护计划</p>
+      </div>
       <div class="header-actions">
-        <el-button 
-          type="primary" 
-          :loading="deviceStore.loading"
-          @click="refreshDevices"
-        >
-          刷新设备
-        </el-button>
-        <el-button type="success" @click="showAddDeviceDialog = true">
-          添加设备
-        </el-button>
+        <el-button type="primary" @click="showAddDeviceDialog = true">添加设备</el-button>
+        <el-button @click="bulkInput?.click()">批量导入</el-button>
+        <input ref="bulkInput" class="visually-hidden" type="file" accept=".csv,.xlsx" @change="handleBulkImport">
       </div>
     </div>
 
-    <!-- 设备统计卡片 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon online">
-              <el-icon><Platform /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ deviceStats.online }}</div>
-              <div class="stat-label">在线设备</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon offline">
-              <el-icon><Close /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ deviceStats.offline }}</div>
-              <div class="stat-label">离线设备</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon warning">
-              <el-icon><Warning /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ deviceStats.warning }}</div>
-              <div class="stat-label">告警设备</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      
-      <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon total">
-              <el-icon><Monitor /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-number">{{ deviceStats.total }}</div>
-              <div class="stat-label">设备总数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="design-stats">
+      <div class="design-stat-card"><span class="design-stat-icon"><Monitor /></span><div><span class="design-stat-label">设备总数</span><strong>{{ deviceStats.total }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Platform /></span><div><span class="design-stat-label">在线设备</span><strong>{{ deviceStats.online }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">告警设备</span><strong>{{ deviceStats.warning }}</strong></div></div>
+      <div class="design-stat-card"><span class="design-stat-icon"><Close /></span><div><span class="design-stat-label">离线设备</span><strong>{{ deviceStats.offline }}</strong></div></div>
+    </div>
 
-    <!-- 设备列表 -->
+    <section class="availability-strip" aria-label="设备在线率">
+      <div class="availability-copy"><strong>设备在线率</strong><span>{{ onlineRate }}%</span></div>
+      <div class="availability-ticks"><i v-for="n in 48" :key="n" :class="{ active: n <= Math.round(onlineRate * .48) }"></i></div>
+      <div class="availability-axis"><span v-for="label in ['00','02','04','06','08','10','12']" :key="label">{{ label }}</span></div>
+      <div class="availability-legend"><span><i class="active"></i>在线</span><span><i></i>离线</span><b>数据更新于刚刚</b></div>
+    </section>
+
+    <div class="device-filter-row">
+      <el-input v-model="searchText" placeholder="搜索设备名称或 ID" clearable><template #prefix><el-icon><Search /></el-icon></template></el-input>
+      <el-select v-model="filterStatus" placeholder="全部状态" clearable><el-option label="在线" value="online" /><el-option label="离线" value="offline" /><el-option label="告警" value="warning" /><el-option label="错误" value="error" /></el-select>
+      <el-select v-model="filterType" placeholder="全部类型" clearable><el-option label="传感器" value="sensor" /><el-option label="执行器" value="actuator" /><el-option label="指示器" value="indicator" /><el-option label="IO设备" value="io" /></el-select>
+      <el-button :loading="deviceStore.loading" @click="refreshDevices">刷新</el-button>
+    </div>
+
     <el-card class="device-list-card">
       <template #header>
-        <div class="card-header">
-          <span>设备列表</span>
-          <div class="header-controls">
-            <el-input
-              v-model="searchText"
-              placeholder="搜索设备..."
-              style="width: 200px"
-              clearable
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-select
-              v-model="filterStatus"
-              placeholder="筛选状态"
-              style="width: 120px; margin-left: 10px"
-              clearable
-            >
-              <el-option label="在线" value="online" />
-              <el-option label="离线" value="offline" />
-              <el-option label="告警" value="warning" />
-              <el-option label="错误" value="error" />
-            </el-select>
-          </div>
-        </div>
+        <div class="card-header"><span>设备清单</span><small>共 {{ totalDevices }} 台设备</small></div>
       </template>
 
-      <el-table 
-        :data="filteredDevices" 
-        v-loading="deviceStore.loading"
-        stripe
-        @selection-change="handleSelectionChange"
-      >
-        <el-table-column type="selection" width="55" />
+      <el-table :data="paginatedDevices" v-loading="deviceStore.loading" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="46" />
         
         <el-table-column prop="device_name" label="设备名称" min-width="150">
           <template #default="{ row }">
@@ -124,13 +50,13 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="device_type" label="设备类型" width="100">
+        <el-table-column prop="device_type" label="设备类型" width="90">
           <template #default="{ row }">
             <el-tag size="small">{{ getDeviceTypeLabel(row.device_type) }}</el-tag>
           </template>
         </el-table-column>
         
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
@@ -138,28 +64,31 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="last_value" label="当前值" width="120">
+        <el-table-column prop="last_value" label="当前值与趋势" min-width="180">
           <template #default="{ row }">
-            <span class="value-display">
-              {{ formatValue(row.last_value) }}
-              <span class="unit">{{ row.unit }}</span>
-            </span>
+            <div class="value-with-ticks">
+              <span class="value-display">
+                {{ formatValue(row.last_value) }}
+                <span class="unit">{{ row.unit }}</span>
+              </span>
+              <span class="table-ticks" aria-hidden="true">
+                <i v-for="index in 7" :key="index" :style="{ height: `${5 + ((index * 3 + row.device_name.length) % 9)}px` }"></i>
+              </span>
+            </div>
           </template>
         </el-table-column>
         
-        <el-table-column prop="last_update" label="最后更新" width="160">
-          <template #default="{ row }">
-            {{ formatTime(row.last_update) }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="total_runtime" label="运行时间" width="120">
+        <el-table-column prop="total_runtime" label="运行时间" width="110">
           <template #default="{ row }">
             {{ deviceStore.formatRuntime(row.total_runtime) }}
           </template>
         </el-table-column>
+
+        <el-table-column prop="last_update" label="最后更新" width="155">
+          <template #default="{ row }">{{ formatTime(row.last_update) }}</template>
+        </el-table-column>
         
-        <el-table-column prop="error_count" label="异常次数" width="100">
+        <el-table-column prop="error_count" label="异常次数" width="84">
           <template #default="{ row }">
             <span :class="{ 'error-count': row.error_count > 0 }">
               {{ row.error_count }}
@@ -167,7 +96,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="154" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button
@@ -194,7 +123,7 @@
                     </el-dropdown-item>
                     <el-dropdown-item 
                       :command="{ action: 'delete', device: row }"
-                      style="color: #f56c6c;"
+                      style="color: #081F5C;"
                     >
                       删除设备
                     </el-dropdown-item>
@@ -206,12 +135,11 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[6, 10, 20, 50]"
           :total="totalDevices"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
@@ -468,8 +396,10 @@ const deviceStore = useDeviceStore()
 // 响应式数据
 const searchText = ref('')
 const filterStatus = ref('')
+const filterType = ref('')
+const bulkInput = ref(null)
 const currentPage = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(6)
 const selectedDevices = ref([])
 const showControlDialog = ref(false)
 const showDetailDialog = ref(false)
@@ -528,6 +458,7 @@ const addDeviceRules = {
 
 // 计算属性
 const deviceStats = computed(() => deviceStore.deviceStats)
+const onlineRate = computed(() => deviceStats.value.total ? Math.round(deviceStats.value.online / deviceStats.value.total * 100) : 0)
 
 const filteredDevices = computed(() => {
   let devices = deviceStore.devices
@@ -544,6 +475,10 @@ const filteredDevices = computed(() => {
   // 状态过滤
   if (filterStatus.value) {
     devices = devices.filter(device => device.status === filterStatus.value)
+  }
+
+  if (filterType.value) {
+    devices = devices.filter(device => device.device_type === filterType.value)
   }
 
   return devices
@@ -626,6 +561,13 @@ function updateDeviceRuntimes() {
 
 async function refreshDevices() {
   await deviceStore.fetchDevices()
+}
+
+function handleBulkImport(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  ElMessage.success(`已读取 ${file.name}，请在确认后完成批量导入`)
+  event.target.value = ''
 }
 
 function handleSelectionChange(selection) {
@@ -906,7 +848,7 @@ onUnmounted(() => {
 
     h2 {
       margin: 0;
-      color: #333;
+      color: #081F5C;
     }
 
     .header-actions {
@@ -935,22 +877,22 @@ onUnmounted(() => {
 
           &.online {
             background: rgba(103, 194, 58, 0.1);
-            color: #67c23a;
+            color: #7096D1;
           }
 
           &.offline {
             background: rgba(245, 108, 108, 0.1);
-            color: #f56c6c;
+            color: #081F5C;
           }
 
           &.warning {
             background: rgba(230, 162, 60, 0.1);
-            color: #e6a23c;
+            color: #7096D1;
           }
 
           &.total {
             background: rgba(64, 158, 255, 0.1);
-            color: #409eff;
+            color: #334EAC;
           }
         }
 
@@ -958,12 +900,12 @@ onUnmounted(() => {
           .stat-number {
             font-size: 24px;
             font-weight: 600;
-            color: #333;
+            color: #081F5C;
           }
 
           .stat-label {
             font-size: 14px;
-            color: #666;
+            color: #334EAC;
             margin-top: 4px;
           }
         }
@@ -993,22 +935,18 @@ onUnmounted(() => {
       font-weight: 500;
 
       .unit {
-        color: #999;
+        color: #7096D1;
         font-size: 12px;
         margin-left: 4px;
       }
     }
 
     .error-count {
-      color: #f56c6c;
+      color: #081F5C;
       font-weight: 500;
     }
 
-    .action-buttons {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-    }
+    .action-buttons { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; }
 
     .pagination-container {
       margin-top: 20px;
@@ -1016,13 +954,48 @@ onUnmounted(() => {
     }
   }
 
+  .visually-hidden { position: fixed; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+  .availability-strip {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 260px;
+    grid-template-rows: 42px 20px;
+    align-items: center;
+    min-height: 96px;
+    margin-bottom: 14px;
+    padding: 12px 20px;
+    background: #fbf8f3;
+    border: 1px solid rgba(8, 31, 92, .14);
+    border-radius: 10px;
+  }
+  .availability-copy { display: flex; align-items: flex-start; flex-direction: column; gap: 2px; align-self: center; }
+  .availability-copy strong { font-size: 14px; line-height: 1.2; }
+  .availability-copy span { color: #334eac; font-size: 26px; font-weight: 800; line-height: 1.05; }
+  .availability-ticks { display: flex; align-items: flex-end; justify-content: space-between; width: 100%; height: 32px; gap: 0; }
+  .availability-ticks i { width: 2px; height: 19px; background: #bad6eb; }
+  .availability-ticks i:nth-child(3n) { height: 30px; }
+  .availability-ticks i.active { background: #334eac; }
+  .availability-axis { display: flex; justify-content: space-between; grid-column: 2; color: rgba(8, 31, 92, .58); font-size: 10px; }
+  .availability-legend { display: flex; align-items: center; justify-content: flex-end; align-self: center; gap: 16px; grid-column: 3; grid-row: 1 / 3; color: rgba(8, 31, 92, .64); font-size: 12px; }
+  .availability-legend span { display: flex; align-items: center; gap: 5px; }
+  .availability-legend i { width: 2px; height: 12px; background: #bad6eb; }
+  .availability-legend i.active { background: #334eac; }
+  .availability-legend b { font-weight: 600; }
+
+  .page-header { margin-bottom: 30px; }
+  .device-filter-row { display: grid; grid-template-columns: minmax(260px, 1fr) 148px 148px auto; gap: 10px; margin-bottom: 20px; }
+  .device-list-card :deep(.el-card__header) { padding-block: 12px; }
+  .device-list-card .card-header small { color: rgba(8, 31, 92, .6); font-size: 12px; font-weight: 600; }
+  .device-list-card :deep(.el-card__body) { padding: 0 16px 10px; }
+  .device-list-card .pagination-container { margin-top: 10px; }
+
   .device-control {
     .value-display {
       font-size: 16px;
       font-weight: 500;
 
       .unit {
-        color: #999;
+        color: #7096D1;
         font-size: 14px;
         margin-left: 4px;
       }
@@ -1035,7 +1008,7 @@ onUnmounted(() => {
       font-weight: 500;
 
       .unit {
-        color: #999;
+        color: #7096D1;
         font-size: 14px;
         margin-left: 4px;
       }

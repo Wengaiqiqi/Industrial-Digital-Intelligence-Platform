@@ -1,169 +1,69 @@
 <template>
   <div class="dashboard">
-    <!-- 顶部统计卡片 -->
-    <el-row :gutter="20" class="stats-row">
-      <el-col :span="6">
-        <div class="status-card">
-          <div class="stat-header">
-            <el-icon class="stat-icon online"><Platform /></el-icon>
-            <span class="stat-title">在线设备</span>
-          </div>
-          <div class="stat-value">{{ deviceStats.online }}/{{ deviceStats.total }}</div>
-          <div class="stat-description">设备运行正常</div>
-        </div>
-      </el-col>
-      
-      <el-col :span="6">
-        <div class="status-card">
-          <div class="stat-header">
-            <el-icon class="stat-icon warning"><Warning /></el-icon>
-            <span class="stat-title">报警设备</span>
-          </div>
-          <div class="stat-value">{{ deviceStats.warning + deviceStats.error }}</div>
-          <div class="stat-description">需要关注</div>
-        </div>
-      </el-col>
-      
-      <el-col :span="6">
-        <div class="status-card">
-          <div class="stat-header">
-            <el-icon class="stat-icon alarm"><Bell /></el-icon>
-            <span class="stat-title">未读报警</span>
-          </div>
-          <div class="stat-value">{{ alarmStore.unreadCount }}</div>
-          <div class="stat-description">待处理报警</div>
-        </div>
-      </el-col>
-      
-      <el-col :span="6">
-        <div class="status-card">
-          <div class="stat-header">
-            <el-icon class="stat-icon efficiency"><TrendCharts /></el-icon>
-            <span class="stat-title">系统效率</span>
-          </div>
-          <div class="stat-value">{{ systemEfficiency }}%</div>
-          <div class="stat-description">运行效率良好</div>
-        </div>
-      </el-col>
-    </el-row>    <!-- 实时数据展示 -->
-    <el-row :gutter="20" class="content-row">
-      <!-- 设备状态监控 -->
-      <el-col :span="24">
-        <el-card class="device-monitor-card">
-          <template #header>
-            <div class="card-header">
-              <span>设备实时状态</span>
-              <el-button 
-                type="primary" 
-                size="small" 
-                @click="refreshDevices"
-                :loading="deviceStore.loading"
-              >
-                刷新
-              </el-button>
-            </div>
-          </template>
-          
-          <div class="device-grid">
-            <div 
-              v-for="device in displayDevices" 
-              :key="device.device_name"
-              class="device-item"
-              @click="showDeviceDetail(device)"
-            >
-              <div class="device-header">
-                <span class="device-name">{{ getDeviceDisplayName(device.device_name) }}</span>
-                <div :class="['status-indicator', device.status]"></div>
-              </div>
-              <div class="device-value">
-                <span class="value">{{ formatValue(device.last_value) }}</span>
-                <span class="unit">{{ device.unit }}</span>
-              </div>
-              <div class="device-type">{{ getDeviceTypeLabel(device.device_type) }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="design-stats dashboard-stats">
+      <div class="design-stat-card">
+        <span class="design-stat-icon"><Platform /></span>
+        <div><span class="design-stat-label">在线设备</span><strong>{{ deviceStats.online }}/{{ deviceStats.total }}</strong></div>
+        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${8 + (n * 7) % 28}px` }"></i></span>
+      </div>
+      <div class="design-stat-card">
+        <span class="design-stat-icon"><Bell /></span>
+        <div><span class="design-stat-label">待处理告警</span><strong>{{ alarmStore.unreadCount }}</strong></div>
+        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${6 + (n * 11) % 30}px` }"></i></span>
+      </div>
+      <div class="design-stat-card">
+        <span class="design-stat-icon"><TrendCharts /></span>
+        <div><span class="design-stat-label">系统效率</span><strong>{{ systemEfficiency }}%</strong></div>
+        <span class="micro-line" aria-hidden="true">⌁⌁⌁</span>
+      </div>
+      <div class="design-stat-card">
+        <span class="design-stat-icon"><DataBoard /></span>
+        <div><span class="design-stat-label">今日数据点</span><strong>{{ totalDataPoints.toLocaleString() }}</strong></div>
+        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${7 + (n * 5) % 31}px` }"></i></span>
+      </div>
+    </div>
 
-    <!-- 报警和系统状态 -->
-    <el-row :gutter="20" class="content-row">
-      <!-- 最新报警 -->
-      <el-col :span="16">
-        <el-card class="alarm-card">
-          <template #header>
-            <div class="card-header">
-              <span>最新报警</span>
-              <el-link type="primary" @click="$router.push('/alarms')">查看全部</el-link>
-            </div>
-          </template>
-          
-          <el-table :data="recentAlarms" style="width: 100%" max-height="300">
-            <el-table-column prop="device_name" label="设备" width="120">
-              <template #default="{ row }">
-                {{ getDeviceDisplayName(row.device_name) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="severity" label="级别" width="80">
-              <template #default="{ row }">
-                <el-tag :type="getSeverityType(row.severity)" size="small">
-                  {{ getSeverityLabel(row.severity) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="message" label="报警信息" />
-            <el-table-column prop="timestamp" label="时间" width="150">
-              <template #default="{ row }">
-                {{ formatTime(row.timestamp) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="80">
-              <template #default="{ row }">
-                <el-button 
-                  v-if="!row.acknowledged"
-                  type="primary" 
-                  size="small" 
-                  @click="acknowledgeAlarm(row.id)"
-                >
-                  确认
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
+    <LieflatOverview :efficiency="systemEfficiency" />
 
-      <!-- 系统信息 -->
-      <el-col :span="8">
-        <el-card class="system-info-card">
-          <template #header>
-            <span>系统信息</span>
-          </template>
-          
-          <div class="system-info">
-            <div class="info-item">
-              <span class="label">数据更新:</span>
-              <span class="value">{{ formatTime(lastDataUpdate) }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">运行时间:</span>
-              <span class="value">{{ systemUptime }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">连接状态:</span>
-              <span class="value">
-                <el-tag :type="connectionStatus === 'connected' ? 'success' : 'danger'" size="small">
-                  {{ connectionStatus === 'connected' ? '已连接' : '断开' }}
-                </el-tag>
-              </span>
-            </div>
-            <div class="info-item">
-              <span class="label">数据点数:</span>
-              <span class="value">{{ totalDataPoints.toLocaleString() }}</span>
-            </div>
-          </div>        </el-card>
-      </el-col>
-    </el-row>
+    <div class="dashboard-tables">
+      <section class="design-table-card">
+        <h3>设备状态</h3>
+        <table>
+          <thead><tr><th>设备</th><th>状态</th><th>当前值</th><th>趋势</th><th>最后更新</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="device in displayDevices.slice(0, 6)" :key="device.device_name">
+              <td>{{ getDeviceDisplayName(device.device_name) }}</td>
+              <td><span class="soft-tag">{{ getStatusLabel(device.status) }}</span></td>
+              <td><strong>{{ formatValue(device.last_value) }}</strong> {{ device.unit }}</td>
+              <td><span class="table-ticks"><i v-for="n in 8" :key="n" :style="{ height: `${4 + (n * 5 + device.device_name.length) % 10}px` }"></i></span></td>
+              <td>{{ new Date(device.last_update || Date.now()).toLocaleTimeString('zh-CN', { hour12: false }) }}</td>
+              <td><button class="table-link" @click="showDeviceDetail(device)">详情</button></td>
+            </tr>
+            <tr v-if="!displayDevices.length"><td colspan="6" class="empty-row">暂无设备数据</td></tr>
+          </tbody>
+        </table>
+        <footer>共 {{ deviceStats.total }} 台设备，在线 {{ deviceStats.online }} 台，离线 {{ deviceStats.offline }} 台</footer>
+      </section>
+
+      <section class="design-table-card">
+        <h3>最近告警</h3>
+        <table>
+          <thead><tr><th>设备</th><th>状态</th><th>当前值</th><th>趋势</th><th>最后更新</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr v-for="alarm in recentAlarms" :key="alarm.id">
+              <td>{{ getDeviceDisplayName(alarm.device_name) }}</td>
+              <td><span class="soft-tag">{{ getSeverityLabel(alarm.severity) }}</span></td>
+              <td class="message-cell">{{ alarm.message }}</td>
+              <td><span class="table-ticks"><i v-for="n in 8" :key="n" :style="{ height: `${4 + (n * 3 + String(alarm.id).length) % 10}px` }"></i></span></td>
+              <td>{{ new Date(alarm.timestamp || Date.now()).toLocaleTimeString('zh-CN', { hour12: false }) }}</td>
+              <td><button class="table-link" @click="$router.push('/alarms')">详情</button></td>
+            </tr>
+            <tr v-if="!recentAlarms.length"><td colspan="6" class="empty-row">暂无告警</td></tr>
+          </tbody>
+        </table>
+        <footer>共 {{ alarmStore.alarms.length }} 条告警，待处理 {{ alarmStore.unreadCount }} 条</footer>
+      </section>
+    </div>
 
     <!-- 设备详情对话框 -->
     <el-dialog
@@ -215,13 +115,14 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useDeviceStore } from '../stores/device'
 import { useAlarmStore } from '../stores/alarm'
+import LieflatOverview from '../components/LieflatOverview.vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { 
   Platform, 
-  Warning, 
   Bell, 
-  TrendCharts 
+  TrendCharts,
+  DataBoard
 } from '@element-plus/icons-vue'
 
 const deviceStore = useDeviceStore()
@@ -379,22 +280,29 @@ async function loadDeviceChart(deviceName) {
       xAxis: {
         type: 'category',
         data: times,
-        boundaryGap: false
+        boundaryGap: false,
+        axisLine: { lineStyle: { color: 'rgba(8,31,92,.18)' } },
+        axisTick: { lineStyle: { color: 'rgba(8,31,92,.18)' } },
+        axisLabel: { color: 'rgba(8,31,92,.62)' }
       },
       yAxis: {
-        type: 'value'
+        type: 'value',
+        splitLine: { lineStyle: { color: 'rgba(8,31,92,.10)' } },
+        axisLabel: { color: 'rgba(8,31,92,.62)' }
       },
       series: [{
         name: '历史数据',
         type: 'line',
-        smooth: true,
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 5,
+        showAllSymbol: values.length <= 30,
         data: values,
-        areaStyle: {
-          opacity: 0.3
-        },
         lineStyle: {
-          color: '#67c23a'
-        }
+          color: '#334EAC',
+          width: 1.8
+        },
+        itemStyle: { color: '#F7F2EB', borderColor: '#334EAC', borderWidth: 1.5 }
       }]
     }
     
@@ -496,38 +404,38 @@ onUnmounted(() => {
         font-size: 24px;
         
         &.online {
-          color: #67c23a;
+          color: #7096D1;
         }
         
         &.warning {
-          color: #e6a23c;
+          color: #7096D1;
         }
         
         &.alarm {
-          color: #f56c6c;
+          color: #081F5C;
         }
         
         &.efficiency {
-          color: #409eff;
+          color: #334EAC;
         }
       }
 
       .stat-title {
         font-size: 14px;
-        color: #666;
+        color: #334EAC;
       }
     }
 
     .stat-value {
       font-size: 32px;
       font-weight: 600;
-      color: #333;
+      color: #081F5C;
       margin: 10px 0;
     }
 
     .stat-description {
       font-size: 12px;
-      color: #999;
+      color: #7096D1;
     }
   }
 
@@ -555,13 +463,13 @@ onUnmounted(() => {
 
     .device-item {
       padding: 15px;
-      border: 1px solid #e4e7ed;
+      border: 1px solid #BAD6EB;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.3s ease;
 
       &:hover {
-        border-color: #409eff;
+        border-color: #334EAC;
         box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
       }
 
@@ -583,19 +491,19 @@ onUnmounted(() => {
         .value {
           font-size: 20px;
           font-weight: 600;
-          color: #409eff;
+          color: #334EAC;
         }
 
         .unit {
           font-size: 12px;
-          color: #999;
+          color: #7096D1;
           margin-left: 4px;
         }
       }
 
       .device-type {
         font-size: 12px;
-        color: #666;
+        color: #334EAC;
       }
     }
   }
@@ -615,7 +523,7 @@ onUnmounted(() => {
       justify-content: space-between;
       align-items: center;
       padding: 10px 0;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 1px solid #F7F2EB;
 
       &:last-child {
         border-bottom: none;
@@ -623,13 +531,13 @@ onUnmounted(() => {
 
       .label {
         font-size: 14px;
-        color: #666;
+        color: #334EAC;
       }
 
       .value {
         font-size: 14px;
         font-weight: 500;
-        color: #333;
+        color: #081F5C;
       }    }
   }
 

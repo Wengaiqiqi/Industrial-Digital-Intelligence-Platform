@@ -1,159 +1,105 @@
 <template>
-  <div id="app">
-    <el-container class="app-container">
-      <!-- 顶部导航栏 -->
+  <el-container class="app-shell" :class="{ 'is-collapsed': collapsed }">
+    <el-aside :width="collapsed ? '76px' : '212px'" class="app-aside">
+      <router-link class="brand" to="/dashboard" aria-label="返回运行总览">
+        <span v-show="!collapsed" class="brand-name">工业数智平台</span>
+      </router-link>
+
+      <el-menu
+        :default-active="$route.path"
+        :collapse="collapsed"
+        :collapse-transition="false"
+        router
+        class="app-menu"
+      >
+        <el-menu-item index="/dashboard"><el-icon><Grid /></el-icon><template #title>运行总览</template></el-menu-item>
+        <el-menu-item index="/devices"><el-icon><Connection /></el-icon><template #title>设备管理</template></el-menu-item>
+        <el-menu-item index="/alarms"><el-icon><Bell /></el-icon><template #title>告警中心</template></el-menu-item>
+        <el-menu-item index="/realtime-monitor"><el-icon><VideoPlay /></el-icon><template #title>实时监控</template></el-menu-item>
+        <el-menu-item index="/historical-data"><el-icon><DataBoard /></el-icon><template #title>历史数据</template></el-menu-item>
+        <el-menu-item index="/prediction"><el-icon><TrendCharts /></el-icon><template #title>预测分析</template></el-menu-item>
+        <el-menu-item index="/3d-scene"><el-icon><Box /></el-icon><template #title>三维场景</template></el-menu-item>
+      </el-menu>
+
+      <button class="collapse-button" type="button" @click="collapsed = !collapsed">
+        <el-icon><DArrowLeft v-if="!collapsed" /><DArrowRight v-else /></el-icon>
+        <span v-if="!collapsed">收起菜单</span>
+      </button>
+    </el-aside>
+
+    <el-container class="workspace">
       <el-header class="app-header">
-        <div class="header-left">
-          <h1 class="system-title">
-            <el-icon class="title-icon"><Platform /></el-icon>
-            工业数智平台
-          </h1>
-        </div>
-        <div class="header-right">
-          <el-badge :value="unreadAlarms" class="alarm-badge">
-            <el-button 
-              type="danger" 
-              :icon="Bell" 
-              circle 
-              @click="showAlarmDialog = true"
-            />
+        <div class="route-heading"><span class="route-title">{{ routeTitle }}</span><span v-if="routeSubtitle" class="route-subtitle">{{ routeSubtitle }}</span></div>
+        <div class="header-tools">
+          <span class="system-clock"><el-icon><Clock /></el-icon>{{ currentTime }}</span>
+          <el-button text circle aria-label="日历"><el-icon><Calendar /></el-icon></el-button>
+          <el-badge :value="unreadAlarms" :hidden="!unreadAlarms">
+            <el-button text circle aria-label="查看告警" @click="showAlarmDialog = true"><el-icon><Bell /></el-icon></el-button>
           </el-badge>
+          <el-button text circle aria-label="帮助"><el-icon><QuestionFilled /></el-icon></el-button>
+          <span class="header-divider"></span>
+          <span class="admin-user"><el-icon><User /></el-icon><span>管理员</span><el-icon class="chevron"><ArrowDown /></el-icon></span>
         </div>
       </el-header>
 
-      <el-container>
-        <!-- 侧边导航栏 -->
-        <el-aside width="200px" class="app-aside">
-          <el-menu
-            :default-active="$route.path"
-            router
-            background-color="#545c64"
-            text-color="#fff"
-            active-text-color="#ffd04b"
-          >
-            <el-menu-item index="/dashboard">
-              <el-icon><Monitor /></el-icon>
-              <span>总览</span>
-            </el-menu-item>            <el-menu-item index="/devices">
-              <el-icon><Setting /></el-icon>
-              <span>设备管理</span>
-            </el-menu-item>
-            <el-menu-item index="/alarms">
-              <el-icon><Bell /></el-icon>
-              <span>报警管理</span>
-            </el-menu-item>
-            <el-menu-item index="/3d-scene">
-              <el-icon><View /></el-icon>
-              <span>3D场景</span>
-            </el-menu-item>            <el-menu-item index="/prediction">
-              <el-icon><TrendCharts /></el-icon>
-              <span>预测分析</span>
-            </el-menu-item>
-            <el-menu-item index="/historical-data">
-              <el-icon><DataBoard /></el-icon>
-              <span>历史数据</span>
-            </el-menu-item>
-            <el-menu-item index="/realtime-monitor">
-              <el-icon><Monitor /></el-icon>
-              <span>实时监控</span>
-            </el-menu-item>
-          </el-menu>
-        </el-aside>
-
-        <!-- 主内容区域 -->
-        <el-main class="app-main">
-          <router-view />
-        </el-main>
-      </el-container>
+      <el-main class="app-main">
+        <router-view />
+      </el-main>
     </el-container>
 
-    <!-- 报警对话框 -->
-    <el-dialog
-      v-model="showAlarmDialog"
-      title="系统报警"
-      width="60%"
-    >
+    <el-dialog v-model="showAlarmDialog" title="系统告警" width="min(920px, 90vw)" class="alarm-dialog">
       <AlarmList :compact="true" />
     </el-dialog>
-  </div>
+  </el-container>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAlarmStore } from './stores/alarm'
 import AlarmList from './components/AlarmList.vue'
-import { 
-  Platform, 
-  Bell, 
-  Monitor, 
-  Setting, 
-  TrendCharts, 
-  View,
-  DataBoard
+import {
+  ArrowDown,
+  Bell,
+  Box,
+  Calendar,
+  Clock,
+  Connection,
+  DArrowLeft,
+  DArrowRight,
+  DataBoard,
+  Grid,
+  QuestionFilled,
+  TrendCharts,
+  User,
+  VideoPlay
 } from '@element-plus/icons-vue'
 
+const route = useRoute()
 const alarmStore = useAlarmStore()
+const collapsed = ref(false)
 const showAlarmDialog = ref(false)
-const unreadAlarms = ref(0)
+const currentTime = ref('')
+const unreadAlarms = computed(() => alarmStore.unreadCount)
+const routeTitle = computed(() => route.path === '/devices' ? '' : (route.meta.title || '工业数智平台'))
+const routeSubtitle = computed(() => ({
+  '/alarms': '优先处理高风险事件，追踪处置闭环',
+  '/prediction': '基于机器学习识别异常趋势与潜在故障'
+}[route.path] || ''))
+
+let clockTimer
+function updateClock() {
+  currentTime.value = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).format(new Date()).replaceAll('/', '-')
+}
 
 onMounted(() => {
-  // 获取未读报警数量
-  alarmStore.fetchAlarms()
-  unreadAlarms.value = alarmStore.unreadCount
+  updateClock()
+  clockTimer = window.setInterval(updateClock, 1000)
+  alarmStore.fetchAlarms({ hours: 24 })
 })
+
+onBeforeUnmount(() => window.clearInterval(clockTimer))
 </script>
-
-<style lang="scss" scoped>
-.app-container {
-  height: 100vh;
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 0 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.header-left {
-  .system-title {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-
-    .title-icon {
-      font-size: 24px;
-    }
-  }
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-
-  .alarm-badge {
-    :deep(.el-badge__content) {
-      right: -5px;
-      top: -5px;
-    }
-  }
-}
-
-.app-aside {
-  background-color: #545c64;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-}
-
-.app-main {
-  padding: 20px;
-  background-color: #f5f5f5;
-  overflow-y: auto;
-}
-</style>

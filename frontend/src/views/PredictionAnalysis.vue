@@ -3,7 +3,7 @@
     <!-- 页面标题 -->
     <div class="page-header">
       <h2>预测分析</h2>
-      <p>基于机器学习的设备故障预测和异常检测</p>
+      <p>基于机器学习识别异常趋势与潜在故障</p>
     </div>
 
     <!-- 智能ML分析组件 -->
@@ -34,14 +34,14 @@ export default {
 
 .page-header h2 {
   margin: 0 0 10px 0;
-  color: #303133;
+  color: #081F5C;
   font-size: 28px;
   font-weight: 600;
 }
 
 .page-header p {
   margin: 0;
-  color: #909399;
+  color: #7096D1;
   font-size: 16px;
 }
 </style>

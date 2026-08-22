@@ -9,7 +9,7 @@ const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue'),
-    meta: { title: '实时监控' }
+    meta: { title: '运行总览' }
   },  {
     path: '/devices',
     name: 'Devices',
@@ -20,13 +20,13 @@ const routes = [
     path: '/alarms',
     name: 'Alarms',
     component: () => import('../views/AlarmManagement.vue'),
-    meta: { title: '报警管理' }
+    meta: { title: '告警中心' }
   },
   {
     path: '/3d-scene',
     name: '3DScene',
     component: () => import('../views/Scene3D.vue'),
-    meta: { title: '3D场景' }
+    meta: { title: '三维场景' }
   },  {
     path: '/prediction',
     name: 'Prediction',
@@ -36,13 +36,13 @@ const routes = [
     path: '/realtime-monitor',
     name: 'RealtimeMonitor',
     component: () => import('../views/RealtimeMonitor.vue'),
-    meta: { title: '实时数据监控' }
+    meta: { title: '实时监控' }
   },
   {
     path: '/historical-data',
     name: 'HistoricalData',
     component: () => import('../views/HistoricalData.vue'),
-    meta: { title: '历史数据分析' }
+    meta: { title: '历史数据' }
   }
 ]
 
