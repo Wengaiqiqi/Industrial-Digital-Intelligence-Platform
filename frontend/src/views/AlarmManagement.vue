@@ -1,246 +1,162 @@
 <template>
-  <div class="alarm-management">
-    <div class="page-header">
-      <div>
-        <h2>告警中心</h2>
-        <p>优先处理高风险事件，追踪处置闭环</p>
+  <div class="page">
+    <section class="kpi-grid" aria-label="告警统计">
+      <div class="card stat" data-status="alarm"><span class="kpi-label">严重 · 未确认</span><span class="kpi-value">{{ open.filter((a) => alarmLevel(a) === 'alarm').length }}</span></div>
+      <div class="card stat" data-status="warn"><span class="kpi-label">预警 · 未确认</span><span class="kpi-value">{{ open.filter((a) => alarmLevel(a) === 'warn').length }}</span></div>
+      <div class="card stat"><span class="kpi-label">今日已确认</span><span class="kpi-value">{{ ackedToday }}</span></div>
+      <div class="card stat"><span class="kpi-label">{{ rangeLabel }}告警总数</span><span class="kpi-value">{{ alarmStore.alarms.length }}</span></div>
+    </section>
+
+    <div class="toolbar">
+      <div class="segmented" role="group" aria-label="告警状态">
+        <button v-for="t in tabs" :key="t.id" type="button" :aria-pressed="tab === t.id" @click="tab = t.id">{{ t.label }} <span class="mono">{{ t.count }}</span></button>
       </div>
-      <div class="header-actions">
-        <el-button 
-          type="primary" 
-          :loading="alarmStore.loading"
-          @click="refreshAlarms"
-        >
-          刷新
-        </el-button>
-        <el-button @click="exportAlarms">导出记录</el-button>
+      <div class="toolbar-right">
+        <el-select v-model="level" aria-label="级别" style="width: 130px"><el-option label="全部级别" value="all" /><el-option label="严重" value="alarm" /><el-option label="预警" value="warn" /></el-select>
+        <el-select v-model="hours" aria-label="时间范围" style="width: 130px"><el-option v-for="r in ranges" :key="r.h" :label="r.label" :value="r.h" /></el-select>
+        <el-button :disabled="!open.length" :loading="busy" @click="ackAll">全部确认</el-button>
       </div>
     </div>
 
-    <div class="design-stats alarm-stats">
-      <div class="design-stat-card"><span class="design-stat-icon"><Bell /></span><div><span class="design-stat-label">待处理</span><strong>{{ alarmStore.unreadCount }}</strong></div></div>
-      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">严重</span><strong>{{ alarmStats.critical + alarmStats.high }}</strong></div></div>
-      <div class="design-stat-card"><span class="design-stat-icon"><Warning /></span><div><span class="design-stat-label">警告</span><strong>{{ alarmStats.medium + alarmStats.warning }}</strong></div></div>
-      <div class="design-stat-card"><span class="design-stat-icon"><CircleCheck /></span><div><span class="design-stat-label">今日已关闭</span><strong>{{ closedAlarmCount }}</strong></div></div>
+    <div class="row align-start">
+      <section class="grow-3 list" aria-label="告警列表">
+        <article v-for="a in list" :key="a.id" class="alarm card" :data-status="a.acknowledged ? 'done' : alarmLevel(a)">
+          <span class="badge" :data-status="a.acknowledged ? 'done' : alarmLevel(a)">{{ a.acknowledged ? '已确认' : alarmLevel(a) === 'alarm' ? '严重' : '预警' }}</span>
+          <div class="alarm-copy">
+            <h2>{{ a.message }}</h2>
+            <div class="mono muted small">{{ tagOf(a.device_name) }} · {{ deviceOf(a.device_name)?.zone || a.device_name }} · {{ fmtTime(a.timestamp, true) }}</div>
+            <div v-if="a.acknowledged" class="muted small">由 {{ a.ack_user || '—' }} 于 {{ fmtTime(a.ack_time, true) }} 确认</div>
+          </div>
+          <div class="alarm-value">
+            <span class="mono val" :data-status="a.acknowledged ? '' : alarmLevel(a)">{{ fmtNum(a.value) }} {{ deviceOf(a.device_name)?.unit || '' }}</span>
+            <span class="mono muted small">阈值 {{ thresholdText(a) }}</span>
+          </div>
+          <div class="alarm-actions">
+            <router-link to="/3d-scene" class="ghost-btn">三维定位</router-link>
+            <el-button v-if="!a.acknowledged" type="primary" @click="ack(a)">确认</el-button>
+          </div>
+        </article>
+        <div v-if="!list.length" class="card empty">{{ tab === 'open' ? '没有未确认的告警' : '该范围内没有告警记录' }}</div>
+      </section>
+
+      <aside class="grow-1 side">
+        <section class="card" aria-labelledby="h-by">
+          <h2 id="h-by" class="side-title">{{ rangeLabel }} · 按设备</h2>
+          <div v-for="b in byDevice" :key="b.name" class="bar-row">
+            <span class="mono small">{{ b.tag }}</span>
+            <span class="bar"><span :style="{ width: b.pct + '%' }" :data-status="b.level"></span></span>
+            <span class="mono small">{{ b.count }}</span>
+          </div>
+          <div v-if="!byDevice.length" class="muted small">暂无数据</div>
+        </section>
+        <section class="card" aria-labelledby="h-tl">
+          <h2 id="h-tl" class="side-title">近 24 小时时间轴</h2>
+          <div class="timeline" role="img" :aria-label="`近 24 小时共 ${last24.length} 条告警`">
+            <span v-for="t in last24" :key="t.id" :style="{ left: t.x + '%' }" :data-status="t.level" :title="`${tagOf(t.device_name)} ${fmtTime(t.timestamp)}`"></span>
+          </div>
+          <div class="timeline-axis mono muted small"><span>24 小时前</span><span>12 小时前</span><span>现在</span></div>
+          <router-link class="link" to="/prediction">在预测分析中查看趋势 →</router-link>
+        </section>
+      </aside>
     </div>
-
-    <LieflatAlarmInsights :alarms="alarmStore.alarms" />
-
-    <!-- 筛选和搜索 -->
-    <el-card class="filter-card">
-      <el-row :gutter="20">
-        <el-col :span="6">          <el-select v-model="filterSeverity" placeholder="报警级别" clearable>
-            <el-option label="严重" value="critical" />
-            <el-option label="高" value="high" />
-            <el-option label="中" value="medium" />
-            <el-option label="低" value="low" />
-            <el-option label="警告" value="warning" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-select v-model="filterStatus" placeholder="确认状态" clearable>
-            <el-option label="已确认" value="true" />
-            <el-option label="未确认" value="false" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-date-picker
-            v-model="dateRange"
-            type="datetimerange"
-            range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-            format="MM/DD HH:mm"
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-col>
-        <el-col :span="6">
-          <el-input
-            v-model="searchText"
-            placeholder="搜索设备或消息..."
-            clearable
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 报警列表 -->
-    <el-card class="alarm-list-card">
-      <AlarmList 
-        ref="alarmListRef"
-        @selection-change="handleSelectionChange"
-      />
-    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useAlarmStore } from '../stores/alarm'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import AlarmList from '../components/AlarmList.vue'
-import LieflatAlarmInsights from '../components/LieflatAlarmInsights.vue'
-import { Bell, CircleCheck, Search, Warning } from '@element-plus/icons-vue'
+import { alarmLevel, deviceOf, fmtTime, tagOf } from '../composables/useLine'
 
 const alarmStore = useAlarmStore()
-const alarmListRef = ref(null)
+const ranges = [{ h: 24, label: '近 24 小时' }, { h: 168, label: '近 7 天' }, { h: 720, label: '近 30 天' }]
+const hours = ref(168)
+const rangeLabel = computed(() => ranges.find((r) => r.h === hours.value).label)
+const tab = ref('open')
+const level = ref('all')
+const busy = ref(false)
 
-// 筛选条件
-const filterSeverity = ref('')
-const filterStatus = ref('')
-const dateRange = ref([])
-const searchText = ref('')
+const load = () => alarmStore.fetchAlarms({ hours: hours.value, limit: 1000 })
+watch(hours, load)
+onMounted(load)
 
-// 报警统计
-const alarmStats = computed(() => {
-  const stats = { critical: 0, high: 0, medium: 0, low: 0, warning: 0 }
-  const alarmsBySeverity = alarmStore.alarmsBySeverity
-  
-  Object.keys(stats).forEach(severity => {
-    stats[severity] = alarmsBySeverity[severity]?.length || 0
-  })
-  
-  return stats
+const open = computed(() => alarmStore.alarms.filter((a) => !a.acknowledged))
+const tabs = computed(() => [
+  { id: 'open', label: '未确认', count: open.value.length },
+  { id: 'done', label: '已确认', count: alarmStore.alarms.length - open.value.length },
+  { id: 'all', label: '全部', count: alarmStore.alarms.length }
+])
+const list = computed(() => alarmStore.alarms
+  .filter((a) => (tab.value === 'all' || (tab.value === 'open') === !a.acknowledged) && (level.value === 'all' || alarmLevel(a) === level.value))
+  .sort((a, b) => (alarmLevel(a) === 'alarm' ? 0 : 1) - (alarmLevel(b) === 'alarm' ? 0 : 1) || new Date(b.timestamp) - new Date(a.timestamp))
+  .slice(0, 200))
+
+const ackedToday = computed(() => {
+  const today = new Date().toDateString()
+  return alarmStore.alarms.filter((a) => a.acknowledged && a.ack_time && new Date(a.ack_time).toDateString() === today).length
 })
-const closedAlarmCount = computed(() => Math.max(0, alarmStore.alarms.length - alarmStore.unreadCount))
 
-// 方法
-async function refreshAlarms() {
-  const params = {}
-  
-  if (filterSeverity.value) {
-    params.severity = filterSeverity.value
-  }
-  
-  if (filterStatus.value) {
-    params.acknowledged = filterStatus.value
-  }
-  
-  if (dateRange.value && dateRange.value.length === 2) {
-    const start = new Date(dateRange.value[0])
-    const end = new Date(dateRange.value[1])
-    const hours = Math.ceil((end - start) / (1000 * 60 * 60))
-    params.hours = hours
-  }
-  
-  await alarmStore.fetchAlarms(params)
-}
-
-async function clearAcknowledged() {
-  try {
-    await ElMessageBox.confirm(
-      '确定要清除所有已确认的报警记录吗？此操作不可恢复。',
-      '清除已确认报警',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-    )
-    
-    alarmStore.clearAcknowledgedAlarms()
-    ElMessage.success('已清除所有已确认的报警')
-    
-  } catch {
-    // 用户取消
-  }
-}
-
-function exportAlarms() {
-  const rows = [['设备', '级别', '告警信息', '时间', '状态'], ...alarmStore.alarms.map(alarm => [
-    alarm.device_name,
-    alarm.severity,
-    alarm.message,
-    alarm.timestamp,
-    alarm.acknowledged ? '已确认' : '待处理'
-  ])]
-  const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\n')
-  const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = `alarm-records-${new Date().toISOString().slice(0, 10)}.csv`
-  anchor.click()
-  URL.revokeObjectURL(url)
-  ElMessage.success('告警记录已导出')
-}
-
-// 监听筛选条件变化
-watch([filterSeverity, filterStatus, dateRange, searchText], () => {
-  refreshAlarms()
-}, { deep: true })
-
-onMounted(() => {
-  alarmStore.fetchAlarms()
+const byDevice = computed(() => {
+  const counts = {}
+  for (const a of alarmStore.alarms) (counts[a.device_name] ||= { name: a.device_name, count: 0, level: 'warn' }).count++
+  for (const a of alarmStore.alarms) if (alarmLevel(a) === 'alarm') counts[a.device_name].level = 'alarm'
+  const list = Object.values(counts).sort((a, b) => b.count - a.count).slice(0, 8)
+  const max = list[0]?.count || 1
+  return list.map((b) => ({ ...b, tag: tagOf(b.name), pct: (b.count / max) * 100 }))
 })
+
+const last24 = computed(() => {
+  const now = Date.now()
+  return alarmStore.alarms
+    .map((a) => ({ ...a, level: alarmLevel(a), x: 100 - ((now - new Date(a.timestamp).getTime()) / 864e5) * 100 }))
+    .filter((a) => a.x >= 0 && a.x <= 100)
+})
+
+const fmtNum = (v) => (v == null ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : Number(v).toFixed(2))
+const thresholdText = (a) => {
+  const d = deviceOf(a.device_name)
+  if (a.threshold != null) return fmtNum(a.threshold)
+  return d?.alarm ? `${d.alarm[0]} – ${d.alarm[1]}` : '—'
+}
+
+async function ack(a) {
+  if (await alarmStore.acknowledgeAlarm(a.id)) ElMessage.success('告警已确认')
+}
+async function ackAll() {
+  busy.value = true
+  const n = await alarmStore.acknowledgeMultipleAlarms(open.value.map((a) => a.id))
+  busy.value = false
+  ElMessage.success(`已确认 ${n} 条告警`)
+}
 </script>
 
-<style lang="scss" scoped>
-.alarm-management {
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-
-    h2 {
-      margin: 0;
-      color: var(--ink);
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 10px;
-    }
-  }
-
-  .stats-row {
-    margin-bottom: 20px;
-
-    .stat-card {
-      .stat-content {
-        text-align: center;
-        padding: 10px;
-
-        .stat-number {
-          font-size: 32px;
-          font-weight: 600;
-          margin-bottom: 8px;
-        }
-
-        .stat-label {
-          font-size: 14px;
-          color: var(--data);
-        }
-      }      &.critical .stat-number {
-        color: var(--ink);
-      }
-
-      &.high .stat-number {
-        color: var(--data-2);
-      }
-
-      &.medium .stat-number {
-        color: var(--data);
-      }      &.warning .stat-number {
-        color: var(--data-2);
-      }
-
-      &.total .stat-number {
-        color: var(--data-2);
-      }
-
-      &.unread .stat-number {
-        color: var(--data-2);
-      }
-    }
-  }
-
-  .filter-card {
-    margin-bottom: 20px;
-  }
-}
+<style scoped>
+.stat { gap: 6px; }
+.stat[data-status="alarm"] { background: var(--alarm-soft); border-color: var(--alarm-line); }
+.stat[data-status="alarm"] .kpi-label, .stat[data-status="alarm"] .kpi-value { color: var(--alarm-fg); }
+.stat[data-status="warn"] { background: var(--warn-soft); border-color: var(--warn-line); }
+.stat[data-status="warn"] .kpi-label, .stat[data-status="warn"] .kpi-value { color: var(--warn-fg); }
+.toolbar, .toolbar-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.align-start { align-items: flex-start; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.alarm { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 16px; padding: 16px 18px; }
+.alarm[data-status="alarm"] { border-color: var(--alarm-line); }
+.alarm[data-status="warn"] { border-color: var(--warn-line); }
+.alarm[data-status="done"] { opacity: .8; }
+.alarm-copy { display: flex; flex: 1 1 260px; flex-direction: column; gap: 4px; min-width: 0; }
+.alarm-copy h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.alarm-value { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; min-width: 110px; }
+.alarm-value .val { font-size: 18px; font-weight: 600; }
+.alarm-actions { display: flex; gap: 8px; }
+.side { display: flex; flex-direction: column; gap: 16px; }
+.side-title { margin: 0; font-size: 15px; font-weight: 700; }
+.bar-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 32px; align-items: center; gap: 10px; }
+.bar-row .mono:last-child { text-align: right; }
+.bar { height: 10px; overflow: hidden; background: var(--quiet); border-radius: 5px; }
+.bar span { display: block; height: 100%; background: var(--warn); border-radius: 5px; }
+.bar span[data-status="alarm"] { background: var(--alarm); }
+.timeline { position: relative; height: 44px; border-bottom: 2px solid var(--grid); }
+.timeline span { position: absolute; bottom: 0; width: 3px; height: 28px; background: var(--warn); border-radius: 2px; transform: translateX(-50%); }
+.timeline span[data-status="alarm"] { height: 40px; background: var(--alarm); }
+.timeline-axis { display: flex; justify-content: space-between; }
 </style>

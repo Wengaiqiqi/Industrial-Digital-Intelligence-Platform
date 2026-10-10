@@ -1,556 +1,178 @@
 <template>
-  <div class="dashboard">
-    <div class="design-stats dashboard-stats">
-      <div class="design-stat-card">
-        <span class="design-stat-icon"><Platform /></span>
-        <div><span class="design-stat-label">在线设备</span><strong>{{ deviceStats.online }}/{{ deviceStats.total }}</strong></div>
-        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${8 + (n * 7) % 28}px` }"></i></span>
+  <div class="page">
+    <section class="kpi-grid" aria-label="关键指标">
+      <div class="card">
+        <div class="kpi-label">在线设备</div>
+        <div class="kpi-value">{{ onlineCount }}<small>/ {{ rows.length }}</small></div>
+        <div class="segments"><span v-for="r in rows" :key="r.id" :data-status="r.status" :title="r.tag"></span></div>
+        <div class="muted small">{{ onlineCount === rows.length ? '全部在线' : `${rows.length - onlineCount} 台超过 15 秒未上报` }}</div>
       </div>
-      <div class="design-stat-card">
-        <span class="design-stat-icon"><Bell /></span>
-        <div><span class="design-stat-label">待处理告警</span><strong>{{ alarmStore.unreadCount }}</strong></div>
-        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${6 + (n * 11) % 30}px` }"></i></span>
+      <div class="card">
+        <div class="kpi-label">未确认告警</div>
+        <div class="kpi-value" :class="{ hot: openAlarms.length }">{{ openAlarms.length }}<small>{{ severeCount }} 严重 · {{ openAlarms.length - severeCount }} 预警</small></div>
+        <div class="split"><span :style="{ flex: severeCount }" data-status="alarm"></span><span :style="{ flex: openAlarms.length - severeCount }" data-status="warn"></span></div>
+        <router-link class="link" to="/alarms">前往告警中心 →</router-link>
       </div>
-      <div class="design-stat-card">
-        <span class="design-stat-icon"><TrendCharts /></span>
-        <div><span class="design-stat-label">系统效率</span><strong>{{ systemEfficiency }}%</strong></div>
-        <span class="micro-line" aria-hidden="true">⌁⌁⌁</span>
+      <div class="card">
+        <div class="kpi-label">当前异常点位</div>
+        <div class="kpi-value">{{ abnormal.length }}<small>/ {{ rows.length }}</small></div>
+        <div class="muted small">{{ abnormal.length ? abnormal.map((r) => r.tag).join('、') : '所有点位在阈值范围内' }}</div>
+        <router-link class="link" to="/3d-scene">在三维场景中查看 →</router-link>
       </div>
-      <div class="design-stat-card">
-        <span class="design-stat-icon"><DataBoard /></span>
-        <div><span class="design-stat-label">今日数据点</span><strong>{{ totalDataPoints.toLocaleString() }}</strong></div>
-        <span class="micro-bars" aria-hidden="true"><i v-for="n in 9" :key="n" :style="{ height: `${7 + (n * 5) % 31}px` }"></i></span>
+      <div class="card">
+        <div class="kpi-label">数据刷新</div>
+        <div class="kpi-value">{{ lastPoll ? fmtTime(lastPoll) : '—' }}</div>
+        <div class="muted small">每 2 秒拉取一次实时数据</div>
+        <router-link class="link" to="/prediction">异常检测与预测分析 →</router-link>
       </div>
-    </div>
+    </section>
 
-    <LieflatOverview :efficiency="systemEfficiency" />
-
-    <div class="dashboard-tables">
-      <section class="design-table-card">
-        <h3>设备状态</h3>
-        <table>
-          <thead><tr><th>设备</th><th>状态</th><th>当前值</th><th>趋势</th><th>最后更新</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-for="device in displayDevices.slice(0, 6)" :key="device.device_name">
-              <td>{{ getDeviceDisplayName(device.device_name) }}</td>
-              <td><span class="soft-tag">{{ getStatusLabel(device.status) }}</span></td>
-              <td><strong>{{ formatValue(device.last_value) }}</strong> {{ device.unit }}</td>
-              <td><span class="table-ticks"><i v-for="n in 8" :key="n" :style="{ height: `${4 + (n * 5 + device.device_name.length) % 10}px` }"></i></span></td>
-              <td>{{ new Date(device.last_update || Date.now()).toLocaleTimeString('zh-CN', { hour12: false }) }}</td>
-              <td><button class="table-link" @click="showDeviceDetail(device)">详情</button></td>
-            </tr>
-            <tr v-if="!displayDevices.length"><td colspan="6" class="empty-row">暂无设备数据</td></tr>
-          </tbody>
-        </table>
-        <footer>共 {{ deviceStats.total }} 台设备，在线 {{ deviceStats.online }} 台，离线 {{ deviceStats.offline }} 台</footer>
-      </section>
-
-      <section class="design-table-card">
-        <h3>最近告警</h3>
-        <table>
-          <thead><tr><th>设备</th><th>状态</th><th>当前值</th><th>趋势</th><th>最后更新</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-for="alarm in recentAlarms" :key="alarm.id">
-              <td>{{ getDeviceDisplayName(alarm.device_name) }}</td>
-              <td><span class="soft-tag">{{ getSeverityLabel(alarm.severity) }}</span></td>
-              <td class="message-cell">{{ alarm.message }}</td>
-              <td><span class="table-ticks"><i v-for="n in 8" :key="n" :style="{ height: `${4 + (n * 3 + String(alarm.id).length) % 10}px` }"></i></span></td>
-              <td>{{ new Date(alarm.timestamp || Date.now()).toLocaleTimeString('zh-CN', { hour12: false }) }}</td>
-              <td><button class="table-link" @click="$router.push('/alarms')">详情</button></td>
-            </tr>
-            <tr v-if="!recentAlarms.length"><td colspan="6" class="empty-row">暂无告警</td></tr>
-          </tbody>
-        </table>
-        <footer>共 {{ alarmStore.alarms.length }} 条告警，待处理 {{ alarmStore.unreadCount }} 条</footer>
-      </section>
-    </div>
-
-    <!-- 设备详情对话框 -->
-    <el-dialog
-      v-model="showDetailDialog"
-      :title="`设备详情: ${currentDevice?.device_name ? getDeviceDisplayName(currentDevice.device_name) : ''}`"
-      width="800px"
-    >
-      <div v-if="currentDevice" class="device-detail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="设备名称">
-            {{ getDeviceDisplayName(currentDevice.device_name) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="设备类型">
-            {{ getDeviceTypeLabel(currentDevice.device_type) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="当前状态">
-            <el-tag :type="getStatusType(currentDevice.status)">
-              {{ getStatusLabel(currentDevice.status) }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="当前值">
-            {{ formatValue(currentDevice.last_value) }} {{ currentDevice.unit }}
-          </el-descriptions-item>
-          <el-descriptions-item label="最后更新">
-            {{ formatTime(currentDevice.last_update) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="运行时间">
-            {{ formatRuntime(currentDevice.total_runtime) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="异常次数">
-            {{ currentDevice.error_count || 0 }}
-          </el-descriptions-item>
-          <el-descriptions-item label="设备ID">
-            {{ currentDevice.device_name }}
-          </el-descriptions-item>
-        </el-descriptions>
-        
-        <!-- 历史数据图表 -->
-        <div class="device-chart" style="margin-top: 20px;">
-          <h4>24小时历史数据</h4>
-          <div ref="deviceChartRef" class="chart-container-detail"></div>
+    <div class="row">
+      <section class="card grow-2" aria-labelledby="h-zones">
+        <div class="card-head">
+          <div><h2 id="h-zones">产线态势</h2><div class="sub">按区域汇总点位状态</div></div>
+          <router-link to="/3d-scene"><el-button type="primary">进入三维场景</el-button></router-link>
         </div>
-      </div>
-    </el-dialog>
+        <div class="zones">
+          <div v-for="z in zoneSummary" :key="z.name" class="zone" :data-status="z.status">
+            <div class="zone-top"><strong>{{ z.name }}</strong><span class="badge" :data-status="z.status">{{ STATUS_LABEL[z.status] }}</span></div>
+            <div v-for="r in z.rows" :key="r.id" class="zone-row">
+              <span class="dot" :data-status="r.status"></span>
+              <span class="mono">{{ r.tag }}</span>
+              <span class="mono val" :data-status="r.status">{{ r.value }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card flush grow-1" aria-labelledby="h-queue">
+        <div class="card-head"><h2 id="h-queue">告警队列</h2><router-link class="link" to="/alarms">全部告警</router-link></div>
+        <div v-if="!openAlarms.length" class="empty">没有未确认的告警</div>
+        <div v-for="a in openAlarms.slice(0, 5)" :key="a.id" class="queue-item">
+          <span class="badge" :data-status="alarmLevel(a)">{{ alarmLevel(a) === 'alarm' ? '严重' : '预警' }}</span>
+          <div class="queue-copy">
+            <div>{{ a.message }}</div>
+            <div class="mono muted small">{{ tagOf(a.device_name) }} · {{ fmtTime(a.timestamp, true) }}</div>
+          </div>
+          <button type="button" class="ghost-btn" @click="ack(a)">确认</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="row">
+      <section class="card grow-3" aria-labelledby="h-trend">
+        <div class="card-head">
+          <h2 id="h-trend">关键参数 · 近 24 小时</h2>
+          <div class="legend-row">
+            <span><i></i>反应釜温度 TT-201 (°C)</span>
+            <span><i class="second"></i>泵出口压力 PT-101 (bar)</span>
+            <span><i class="limit"></i>温度上限 85 °C</span>
+          </div>
+        </div>
+        <div ref="trendEl" class="trend" role="img" aria-label="近 24 小时反应釜温度与泵出口压力趋势"></div>
+        <div v-if="!trend.t.length && !trend.p.length" class="empty">近 24 小时暂无历史数据</div>
+      </section>
+
+      <section class="card grow-2" aria-labelledby="h-matrix">
+        <div class="card-head"><h2 id="h-matrix">设备矩阵</h2><router-link class="link" to="/devices">设备管理</router-link></div>
+        <div class="matrix">
+          <div v-for="r in rows" :key="r.id" class="tile" :data-status="r.status">
+            <div class="tile-top"><span class="mono muted">{{ r.tag }}</span><span class="dot" :data-status="r.status"></span></div>
+            <div class="small">{{ r.name }}</div>
+            <div class="mono tile-val val" :data-status="r.status">{{ r.value }}</div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { theme, cssVar } from '../theme'
-import { useDeviceStore } from '../stores/device'
-import { useAlarmStore } from '../stores/alarm'
-import LieflatOverview from '../components/LieflatOverview.vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
-import { 
-  Platform, 
-  Bell, 
-  TrendCharts,
-  DataBoard
-} from '@element-plus/icons-vue'
+import { deviceAPI } from '../api'
+import { useAlarmStore } from '../stores/alarm'
+import { useLine, alarmLevel, fmtTime, tagOf, STATUS_ORDER } from '../composables/useLine'
+import { useChart, baseOption } from '../composables/useChart'
+import { ZONES, STATUS_LABEL } from '../utils/plantLayout'
 
-const deviceStore = useDeviceStore()
+const { rows, lastPoll } = useLine()
 const alarmStore = useAlarmStore()
 
-// 响应式数据
-const lastDataUpdate = ref(new Date())
-const systemUptime = ref('') // 从前端启动开始计算
-const connectionStatus = ref('connected')
-const totalDataPoints = ref(0) // 动态更新数据点数
-const systemEfficiency = ref(96.8)
+const onlineCount = computed(() => rows.value.filter((r) => r.status !== 'offline').length)
+const abnormal = computed(() => rows.value.filter((r) => r.status === 'warn' || r.status === 'alarm'))
+const openAlarms = computed(() => alarmStore.alarms.filter((a) => !a.acknowledged))
+const severeCount = computed(() => openAlarms.value.filter((a) => alarmLevel(a) === 'alarm').length)
 
-// 设备详情对话框相关
-const showDetailDialog = ref(false)
-const currentDevice = ref(null)
-const deviceChartRef = ref(null)
-const deviceChart = ref(null)
+const worst = (list) => list.reduce((w, r) => (STATUS_ORDER[r.status] < STATUS_ORDER[w] ? r.status : w), 'ok')
+const zoneSummary = computed(() => [...ZONES.map((z) => z.name), '未分区']
+  .map((name) => ({ name, rows: rows.value.filter((r) => r.zone === name) }))
+  .filter((z) => z.rows.length)
+  .map((z) => ({ ...z, status: worst(z.rows) })))
 
-// 数据更新定时器
-let dataUpdateTimer = null
+async function ack(a) {
+  if (await alarmStore.acknowledgeAlarm(a.id)) ElMessage.success('告警已确认')
+}
 
-// 计算属性
-const deviceStats = computed(() => deviceStore.deviceStats)
+const trendEl = ref(null)
+const trend = reactive({ t: [], p: [] })
+async function loadTrend() {
+  const get = async (name) => {
+    try {
+      const res = await deviceAPI.getDeviceHistory(name, 24, 2000)
+      return (res.data || []).map((d) => [new Date(d.timestamp).getTime(), d.value]).sort((a, b) => a[0] - b[0])
+    } catch { return [] }
+  }
+  ;[trend.t, trend.p] = await Promise.all([get('temperature_sensor_2'), get('pressure_sensor_1')])
+}
+useChart(trendEl, (c) => baseOption(c, {
+  grid: { left: 44, right: 44, top: 16, bottom: 28 },
+  yAxis: [
+    { type: 'value', scale: true, axisLabel: { color: c('--muted'), fontSize: 11 }, splitLine: { lineStyle: { color: c('--chart-grid') } } },
+    { type: 'value', scale: true, axisLabel: { color: c('--muted'), fontSize: 11 }, splitLine: { show: false } }
+  ],
+  series: [
+    { name: 'TT-201', type: 'line', showSymbol: false, data: trend.t, lineStyle: { color: c('--data'), width: 2 }, itemStyle: { color: c('--data') },
+      markLine: { symbol: 'none', silent: true, label: { show: false }, lineStyle: { color: c('--warn'), type: 'dashed' }, data: [{ yAxis: 85 }] } },
+    { name: 'PT-101', type: 'line', yAxisIndex: 1, showSymbol: false, data: trend.p, lineStyle: { color: c('--chart-2'), width: 1.6 }, itemStyle: { color: c('--chart-2') } }
+  ]
+}), trend)
 
-const displayDevices = computed(() => {
-  return deviceStore.devices.slice(0, 12) // 显示前12个设备，适应全宽布局
+let alarmTimer
+onMounted(() => {
+  loadTrend()
+  alarmTimer = setInterval(() => alarmStore.fetchAlarms({ hours: 24 }), 10000)
 })
-
-const recentAlarms = computed(() => {
-  return alarmStore.recentAlarms.slice(0, 5) // 显示最新5条报警
-})
-
-// 方法
-function getDeviceDisplayName(deviceName) {
-  const nameMap = {
-    'temperature_sensor_1': '温度传感器1',
-    'temperature_sensor_2': '温度传感器2',
-    'fan_1': '风扇1',
-    'fan_2': '风扇2',
-    'servo_motor_1': '伺服电机1',
-    'servo_motor_2': '伺服电机2',
-    'pressure_sensor_1': '压力传感器1',
-    'flow_meter_1': '流量计1',
-    'indicator_light_1': '指示灯1',
-    'digital_input_1': '数字输入1',
-    'digital_output_1': '数字输出1'
-  }
-  return nameMap[deviceName] || deviceName
-}
-
-function getDeviceTypeLabel(deviceType) {
-  const typeMap = {
-    'sensor': '传感器',
-    'actuator': '执行器',
-    'indicator': '指示器',
-    'io': 'IO设备'
-  }
-  return typeMap[deviceType] || deviceType
-}
-
-function formatValue(value) {
-  if (typeof value !== 'number') return '--'
-  return value.toFixed(1)
-}
-
-function formatTime(timestamp) {
-  if (!timestamp) return '--'
-  return new Date(timestamp).toLocaleString()
-}
-
-function getSeverityType(severity) {
-  const typeMap = {
-    'critical': 'danger',
-    'high': 'danger',
-    'medium': 'warning',
-    'low': 'info'
-  }
-  return typeMap[severity] || 'info'
-}
-
-function getSeverityLabel(severity) {
-  const labelMap = {
-    'critical': '严重',
-    'high': '高',
-    'medium': '中',
-    'low': '低'
-  }
-  return labelMap[severity] || severity
-}
-
-function showDeviceDetail(device) {
-  currentDevice.value = device
-  showDetailDialog.value = true
-  
-  // 加载设备历史数据图表
-  nextTick(() => {
-    loadDeviceChart(device.device_name)
-  })
-}
-
-function getStatusType(status) {
-  const typeMap = {
-    'online': 'success',
-    'offline': 'danger',
-    'warning': 'warning',
-    'error': 'danger',
-    'maintenance': 'info'
-  }
-  return typeMap[status] || 'info'
-}
-
-function getStatusLabel(status) {
-  const labelMap = {
-    'online': '在线',
-    'offline': '离线',
-    'warning': '告警',
-    'error': '故障',
-    'maintenance': '维护中'
-  }
-  return labelMap[status] || status
-}
-
-function formatRuntime(runtime) {
-  // 使用设备store中的格式化函数
-  return deviceStore.formatRuntime(runtime)
-}
-
-let chartDevice = null
-watch(theme, () => chartDevice && nextTick(() => loadDeviceChart(chartDevice)))
-
-async function loadDeviceChart(deviceName) {
-  if (!deviceChartRef.value) return
-  chartDevice = deviceName
-  
-  try {
-    // 获取设备历史数据
-    const response = await fetch(`/api/devices/${deviceName}/history?hours=24`)
-    const data = await response.json()
-    
-    if (!deviceChart.value) {
-      deviceChart.value = echarts.init(deviceChartRef.value)
-    }
-    
-    const times = data.data?.map(item => new Date(item.timestamp).toLocaleTimeString()) || []
-    const values = data.data?.map(item => item.value) || []
-    
-    const option = {
-      title: {
-        show: false
-      },
-      tooltip: {
-        trigger: 'axis',
-        formatter: function(params) {
-          const time = params[0].axisValueLabel
-          const value = params[0].value
-          return `${time}<br/>数值: ${value}`
-        }
-      },
-      xAxis: {
-        type: 'category',
-        data: times,
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: cssVar('--grid') } },
-        axisTick: { lineStyle: { color: cssVar('--grid') } },
-        axisLabel: { color: cssVar('--muted') }
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: cssVar('--chart-grid') } },
-        axisLabel: { color: cssVar('--muted') }
-      },
-      series: [{
-        name: '历史数据',
-        type: 'line',
-        smooth: false,
-        symbol: 'circle',
-        symbolSize: 5,
-        showAllSymbol: values.length <= 30,
-        data: values,
-        lineStyle: {
-          color: cssVar('--data'),
-          width: 1.8
-        },
-        itemStyle: { color: cssVar('--paper-soft'), borderColor: cssVar('--data'), borderWidth: 1.5 }
-      }]
-    }
-    
-    deviceChart.value.setOption(option)
-  } catch (error) {
-    console.error('加载设备历史数据失败:', error)
-    ElMessage.warning('加载历史数据失败')
-  }
-}
-
-async function acknowledgeAlarm(alarmId) {
-  const success = await alarmStore.acknowledgeAlarm(alarmId)
-  if (success) {
-    ElMessage.success('报警已确认')
-  }
-}
-
-// 更新系统运行时间
-function updateSystemUptime() {
-  const startTime = deviceStore.startTime
-  const currentTime = Date.now()
-  const uptimeSeconds = Math.floor((currentTime - startTime) / 1000)
-  systemUptime.value = deviceStore.formatRuntime(uptimeSeconds)
-}
-
-// 更新总数据点数
-async function updateTotalDataPoints() {
-  try {
-    const response = await fetch('/api/statistics/dashboard')
-    const data = await response.json()
-    if (data.success && data.data.data_points) {
-      totalDataPoints.value = data.data.data_points.total
-    }
-  } catch (error) {
-    console.error('获取数据点统计失败:', error)
-  }
-}
-
-async function refreshDevices() {
-  await deviceStore.fetchRealtimeDevices()
-  lastDataUpdate.value = new Date()
-  updateSystemUptime()
-}
-
-// 生命周期
-onMounted(async () => {
-  // 初始化数据
-  await deviceStore.fetchDevices()
-  await alarmStore.fetchAlarms({ hours: 24 })
-  
-  // 初始化系统运行时间和数据点数
-  updateSystemUptime()
-  await updateTotalDataPoints()
-  
-  // 启动定时更新
-  dataUpdateTimer = setInterval(() => {
-    refreshDevices()
-    updateTotalDataPoints() // 每次都更新数据点数
-  }, 5000) // 5秒更新一次设备数据
-  
-  // 启动运行时间更新定时器
-  setInterval(() => {
-    updateSystemUptime()
-  }, 1000) // 每秒更新运行时间
-})
-
-onUnmounted(() => {
-  if (dataUpdateTimer) {
-    clearInterval(dataUpdateTimer)
-  }
-  if (deviceChart.value) {
-    deviceChart.value.dispose()
-  }
-})
+onBeforeUnmount(() => clearInterval(alarmTimer))
 </script>
 
-<style lang="scss" scoped>
-.dashboard {
-  .stats-row {
-    margin-bottom: 20px;
-  }
-
-  .content-row {
-    margin-bottom: 20px;
-  }
-
-  .status-card {
-    height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-
-    .stat-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      .stat-icon {
-        font-size: 24px;
-        
-        &.online {
-          color: var(--data-2);
-        }
-        
-        &.warning {
-          color: var(--data-2);
-        }
-        
-        &.alarm {
-          color: var(--ink);
-        }
-        
-        &.efficiency {
-          color: var(--data);
-        }
-      }
-
-      .stat-title {
-        font-size: 14px;
-        color: var(--data);
-      }
-    }
-
-    .stat-value {
-      font-size: 32px;
-      font-weight: 600;
-      color: var(--ink);
-      margin: 10px 0;
-    }
-
-    .stat-description {
-      font-size: 12px;
-      color: var(--data-2);
-    }
-  }
-
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .device-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 15px;
-
-    @media (max-width: 1600px) {
-      grid-template-columns: repeat(4, 1fr);
-    }
-
-    @media (max-width: 1200px) {
-      grid-template-columns: repeat(3, 1fr);
-    }
-
-    @media (max-width: 768px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .device-item {
-      padding: 15px;
-      border: 1px solid var(--data-3);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-
-      &:hover {
-        border-color: var(--data);
-        box-shadow: 0 2px 8px var(--accent-soft);
-      }
-
-      .device-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-
-        .device-name {
-          font-size: 14px;
-          font-weight: 500;
-        }
-      }
-
-      .device-value {
-        margin-bottom: 5px;
-
-        .value {
-          font-size: 20px;
-          font-weight: 600;
-          color: var(--data);
-        }
-
-        .unit {
-          font-size: 12px;
-          color: var(--data-2);
-          margin-left: 4px;
-        }
-      }
-
-      .device-type {
-        font-size: 12px;
-        color: var(--data);
-      }
-    }
-  }
-
-  .chart-container {
-    height: 300px;
-
-    .chart {
-      width: 100%;
-      height: 100%;
-    }
-  }
-
-  .system-info {
-    .info-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--paper);
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .label {
-        font-size: 14px;
-        color: var(--data);
-      }
-
-      .value {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--ink);
-      }    }
-  }
-
-  .device-detail {
-    .chart-container-detail {
-      height: 300px;
-      margin-top: 10px;
-    }
-  }
-}
+<style scoped>
+.kpi-value.hot { color: var(--alarm-fg); }
+.segments { display: flex; gap: 3px; }
+.segments span { flex: 1; height: 6px; background: var(--data); border-radius: 2px; }
+.segments span[data-status="warn"] { background: var(--warn); }
+.segments span[data-status="alarm"] { background: var(--alarm); }
+.segments span[data-status="offline"] { background: var(--quiet); }
+.split { display: flex; gap: 2px; height: 6px; overflow: hidden; background: var(--quiet); border-radius: 3px; }
+.split span[data-status="alarm"] { background: var(--alarm); }
+.split span[data-status="warn"] { background: var(--warn); }
+.zones { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.zone { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--grid); border-radius: 10px; }
+.zone[data-status="warn"] { border-color: var(--warn-line); }
+.zone[data-status="alarm"] { border-color: var(--alarm-line); }
+.zone-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
+.zone-row { display: grid; grid-template-columns: 8px auto 1fr; align-items: center; gap: 8px; font-size: 12px; }
+.zone-row .val { text-align: right; }
+.queue-item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--grid); }
+.queue-item:last-child { border-bottom: 0; }
+.queue-copy { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; }
+.trend { height: 260px; }
+.legend-row .second { background: var(--chart-2); }
+.legend-row .limit { height: 0; background: none; border-top: 2px dashed var(--warn); }
+.matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; }
+.tile { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--grid); border-radius: 10px; }
+.tile[data-status="warn"] { border-color: var(--warn-line); }
+.tile[data-status="alarm"] { border-color: var(--alarm-line); }
+.tile-top { display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+.tile-val { font-size: 15px; font-weight: 600; }
 </style>

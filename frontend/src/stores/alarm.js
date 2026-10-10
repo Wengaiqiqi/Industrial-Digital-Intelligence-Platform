@@ -11,25 +11,6 @@ export const useAlarmStore = defineStore('alarm', () => {
   const unreadCount = computed(() => {
     return alarms.value.filter(alarm => !alarm.acknowledged).length
   })
-    // 按严重程度分组的报警
-  const alarmsBySeverity = computed(() => {
-    const groups = {
-      critical: [],
-      high: [],
-      medium: [],
-      low: [],
-      warning: []
-    }
-    
-    alarms.value.forEach(alarm => {
-      if (groups[alarm.severity]) {
-        groups[alarm.severity].push(alarm)
-      }
-    })
-    
-    return groups
-  })
-  
   // 最近24小时的报警
   const recentAlarms = computed(() => {
     const yesterday = new Date()
@@ -84,27 +65,14 @@ export const useAlarmStore = defineStore('alarm', () => {
     return successCount
   }
   
-  // 添加新报警（用于实时更新）
-  function addAlarm(alarm) {
-    alarms.value.unshift(alarm)
-  }
-  
-  // 清除已确认的报警
-  function clearAcknowledgedAlarms() {
-    alarms.value = alarms.value.filter(alarm => !alarm.acknowledged)
-  }
-  
   return {
     alarms,
     loading,
     lastUpdate,
     unreadCount,
-    alarmsBySeverity,
     recentAlarms,
     fetchAlarms,
     acknowledgeAlarm,
-    acknowledgeMultipleAlarms,
-    addAlarm,
-    clearAcknowledgedAlarms
+    acknowledgeMultipleAlarms
   }
 })

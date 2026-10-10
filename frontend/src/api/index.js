@@ -79,13 +79,6 @@ export const deviceAPI = {
   // 删除设备
   deleteDevice(deviceName) {
     return api.delete(`/devices/${deviceName}`)
-  },
-
-  // 获取设备统计信息
-  getDeviceStatistics(deviceName, hours = 24) {
-    return api.get(`/devices/${deviceName}/statistics`, {
-      params: { hours }
-    })
   }
 }
 

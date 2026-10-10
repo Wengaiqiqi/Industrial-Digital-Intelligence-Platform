@@ -455,9 +455,9 @@ class MLModelService:
         """检测异常"""
         return self.anomaly_detector.predict(data)
     
-    def predict_failure_probability(self, data):
-        """预测故障概率"""
-        return self.predictive_model.predict_failure_probability(data)
+    def predict_next_value(self, data):
+        """LSTM 预测下一时刻数值"""
+        return self.predictive_model.predict_next_value(data)
     
 
 class MLAnalysisService:
@@ -499,10 +499,10 @@ class MLAnalysisService:
             if len(data) >= 100:
                 # 使用设备专属数据进行预测
                 device_predictive_model.train(data)
-                prediction_result = device_predictive_model.predict_failure_probability(data)
+                prediction_result = device_predictive_model.predict_next_value(data)
             else:
                 # 使用全局模型
-                prediction_result = self.ml_service.predict_failure_probability(data)
+                prediction_result = self.ml_service.predict_next_value(data)
             
             # 数据统计分析
             statistics = self._calculate_device_statistics(data, device_name)
