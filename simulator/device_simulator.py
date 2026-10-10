@@ -240,20 +240,19 @@ class IndustrialDeviceSimulator:
         normal_variation = current_value * random.uniform(-0.03, 0.03)
         new_value = current_value + normal_variation
         
-        # 温度传感器特殊逻辑
+        # 温度传感器特殊逻辑：向一个平衡温度逐步靠拢（一阶惯性），而不是每个周期直接减去风扇降温量。
+        # 原来的写法每 2 秒降 2°C 以上，几秒内就压到量程下限并一直贴着下限。
         if 'temperature' in device_name:
-            # 模拟环境温度变化和设备发热
-            time_factor = time.time() % 3600  # 1小时周期
-            seasonal_variation = 5 * math.sin(time_factor / 3600 * 2 * math.pi)
-            new_value += seasonal_variation * 0.1
-            
-            # 如果风扇运行，温度会降低
-            fan_cooling_effect = 0
-            for fan_name, fan_device in self.devices.items():
-                if 'fan' in fan_name and fan_device['status'] == 'online':
-                    fan_cooling_effect += fan_device['value'] * 0.001  # 风扇转速影响
-            
-            new_value -= fan_cooling_effect
+            device = self.devices[device_name]
+            base = device.setdefault('base_value', current_value)
+            # 1 小时周期的环境温度变化
+            time_factor = time.time() % 3600
+            ambient = 5 * math.sin(time_factor / 3600 * 2 * math.pi)
+            # 风扇总转速高于额定值时降温，低于额定值时升温
+            fan_speed = sum(f['value'] for n, f in self.devices.items() if 'fan' in n and f['status'] == 'online')
+            cooling = (fan_speed - 2200) * 0.004
+            equilibrium = base + ambient - cooling
+            new_value = current_value + (equilibrium - current_value) * 0.1 + random.uniform(-0.3, 0.3)
         
         # 异常模式
         if self.anomaly_mode and random.random() < 0.1:  # 10%概率产生异常

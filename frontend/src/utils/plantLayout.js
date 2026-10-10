@@ -61,6 +61,7 @@ export function formatValue(dev, reading) {
   if (dev.special === 'io') return `DI ${reading.di ?? '—'} · DO ${reading.do ?? '—'}`
   if (dev.special === 'lamp') return ['熄灭', '运行', '预警', '故障'][reading.value] ?? String(reading.value)
   const v = Number(reading.value)
+  if ((dev.unit ?? reading.unit) === 'digital') return v ? 'ON' : 'OFF'
   const text = Math.abs(v) >= 100 ? Math.round(v).toLocaleString('en-US') : v.toFixed(Math.abs(v) < 10 ? 2 : 1)
   const unit = dev.unit ?? reading.unit
   return unit ? `${text}${unit === '°' ? '' : ' '}${unit}` : text

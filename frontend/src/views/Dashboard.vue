@@ -38,7 +38,7 @@
             <div class="zone-top"><strong>{{ z.name }}</strong><span class="badge" :data-status="z.status">{{ STATUS_LABEL[z.status] }}</span></div>
             <div v-for="r in z.rows" :key="r.id" class="zone-row">
               <span class="dot" :data-status="r.status"></span>
-              <span class="mono">{{ r.tag }}</span>
+              <span class="mono tag" :title="r.tag">{{ r.tag }}</span>
               <span class="mono val" :data-status="r.status">{{ r.value }}</span>
             </div>
           </div>
@@ -161,8 +161,10 @@ onBeforeUnmount(() => clearInterval(alarmTimer))
 .zone[data-status="warn"] { border-color: var(--warn-line); }
 .zone[data-status="alarm"] { border-color: var(--alarm-line); }
 .zone-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 14px; }
-.zone-row { display: grid; grid-template-columns: 8px auto 1fr; align-items: center; gap: 8px; font-size: 12px; }
-.zone-row .val { text-align: right; }
+.zone-row { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; }
+/* 设备名过长时截断，数值和单位保持在一行 */
+.zone-row .tag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zone-row .val { text-align: right; white-space: nowrap; }
 .queue-item { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--grid); }
 .queue-item:last-child { border-bottom: 0; }
 .queue-copy { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; font-size: 13px; }

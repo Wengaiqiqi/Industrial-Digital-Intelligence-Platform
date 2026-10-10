@@ -34,7 +34,7 @@
           <span class="small">{{ s.title }}</span>
           <span class="mono muted small">{{ s.unit }}<template v-if="s.alarm"> · 阈值 {{ s.alarm.join(' – ') }}</template></span>
         </div>
-        <MiniChart :points="s.points" :alarm="s.alarm" :range="chartRange" />
+        <MiniChart :points="s.points" :alarm="s.alarm" :range="axisRange" />
       </div>
       <div v-if="!seriesList.length" class="empty">选择设备后点击查询</div>
     </section>
@@ -97,6 +97,12 @@ const seriesList = ref([])
 const stats = ref([])
 const totalRecords = ref(0)
 const chartRange = computed(() => range.value.map((d) => new Date(d).getTime()))
+// 时间轴从最早一条数据开始：数据只覆盖查询范围的一小段时，不再全部挤在最右边
+const axisRange = computed(() => {
+  const [start, end] = chartRange.value
+  const first = Math.min(...seriesList.value.map((s) => s.points[0]?.[0] ?? Infinity))
+  return [Number.isFinite(first) ? Math.max(start, first) : start, end]
+})
 
 const deviceOptions = computed(() => DEVICES.flatMap((d) => [d.mqtt].flat().map((m) => ({ value: m, label: `${d.tag} ${d.name}${Array.isArray(d.mqtt) ? ` (${m})` : ''}` }))))
 const titleOf = (name) => deviceOf(name)?.name || name
