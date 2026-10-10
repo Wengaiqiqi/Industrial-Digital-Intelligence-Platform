@@ -330,13 +330,7 @@ class IndustrialDeviceSimulator:
                     "industrial/sensors/data", 
                     json.dumps(data_packet, ensure_ascii=False)
                 )
-                
-                # 单独发布每个设备的数据
-                for device_name, device_data in data_packet['devices'].items():
-                    self.mqtt_client.publish(
-                        f"industrial/device/{device_name}",
-                        json.dumps(device_data, ensure_ascii=False)
-                    )
+                # 不再按设备重复发布 industrial/device/<名称>：后端会把两种主题都入库，重复发布会让数据翻倍
             else:
                 # 如果MQTT不可用，输出到日志（用于调试）
                 logger.debug(f"设备数据更新: {len(data_packet['devices'])} 个设备")

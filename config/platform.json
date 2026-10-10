@@ -1,0 +1,56 @@
+{
+  "mqtt": {
+    "host": "127.0.0.1",
+    "port": 1883,
+    "username": "",
+    "password": "",
+    "tls": false,
+    "ca_cert": "",
+    "client_id_prefix": "idip",
+    "keepalive": 60,
+    "topic_batch": "industrial/sensors/data",
+    "topic_device_prefix": "industrial/device",
+    "topic_control_prefix": "industrial/control"
+  },
+  "offline_timeout_seconds": 30,
+  "retention_days": 0,
+  "api_token": "",
+  "cors_origins": "*",
+  "start": {
+    "embedded_broker": true,
+    "device_simulator": true,
+    "modbus_simulator": true
+  },
+  "modbus": {
+    "enabled": true,
+    "poll_interval_seconds": 2,
+    "connections": {
+      "plc1": { "host": "127.0.0.1", "port": 5020, "unit": 1, "timeout": 3 }
+    }
+  },
+  "devices": {
+    "temperature_sensor_1": { "type": "sensor", "unit": "°C", "alarm_min": 18, "alarm_max": 85 },
+    "temperature_sensor_2": { "type": "sensor", "unit": "°C", "alarm_min": 18, "alarm_max": 85 },
+    "pressure_sensor_1": { "type": "sensor", "unit": "bar", "alarm_min": 0.3, "alarm_max": 5.5 },
+    "flow_meter_1": { "type": "sensor", "unit": "L/min", "alarm_min": 5, "alarm_max": 95 },
+    "fan_1": { "type": "actuator", "unit": "RPM" },
+    "fan_2": { "type": "actuator", "unit": "RPM" },
+    "servo_motor_1": { "type": "actuator", "unit": "°" },
+    "servo_motor_2": { "type": "actuator", "unit": "°" },
+    "indicator_light_1": { "type": "indicator", "unit": "state" },
+    "digital_input_1": { "type": "io", "unit": "digital" },
+    "digital_output_1": { "type": "io", "unit": "digital" },
+
+    "plc_temperature_1": { "type": "sensor", "unit": "°C", "alarm_min": 18, "alarm_max": 85,
+      "modbus": { "connection": "plc1", "table": "input", "address": 0, "datatype": "uint16", "scale": 0.01 } },
+    "plc_pressure_1": { "type": "sensor", "unit": "bar", "alarm_min": 0.3, "alarm_max": 5.5,
+      "modbus": { "connection": "plc1", "table": "input", "address": 10, "datatype": "uint16", "scale": 0.01 } },
+    "plc_flow_1": { "type": "sensor", "unit": "L/min", "alarm_min": 5, "alarm_max": 95,
+      "modbus": { "connection": "plc1", "table": "input", "address": 20, "datatype": "uint16", "scale": 0.1 } },
+    "plc_fan_speed": { "type": "actuator", "unit": "RPM",
+      "modbus": { "connection": "plc1", "table": "input", "address": 30, "datatype": "uint16", "scale": 1,
+                  "write": { "table": "holding", "address": 0, "datatype": "uint16", "scale": 1 } } },
+    "plc_limit_switch_1": { "type": "io", "unit": "digital",
+      "modbus": { "connection": "plc1", "table": "discrete", "address": 0 } }
+  }
+}

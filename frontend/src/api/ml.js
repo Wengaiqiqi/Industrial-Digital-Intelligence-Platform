@@ -1,5 +1,5 @@
 // 机器学习分析API
-import request from './index'
+import request, { API_TOKEN } from './index'
 import axios from 'axios'
 
 // 为ML训练操作创建专门的axios实例（更长超时）
@@ -7,7 +7,8 @@ const mlRequest = axios.create({
   baseURL: '/api',
   timeout: 120000, // ML训练需要2分钟超时
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    ...(API_TOKEN && { 'X-API-Token': API_TOKEN })
   }
 })
 

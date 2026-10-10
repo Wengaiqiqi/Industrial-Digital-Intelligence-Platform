@@ -1,6 +1,8 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
+export const API_TOKEN = import.meta.env.VITE_API_TOKEN || ''
+
 // 创建axios实例
 const api = axios.create({
   baseURL: '/api',
@@ -13,7 +15,8 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   config => {
-    // 在发送请求之前做些什么
+    // 后端配置了 api_token 时，在 frontend/.env.local 里设置同样的 VITE_API_TOKEN
+    if (API_TOKEN) config.headers['X-API-Token'] = API_TOKEN
     return config
   },
   error => {

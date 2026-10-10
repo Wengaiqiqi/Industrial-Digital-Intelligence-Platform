@@ -117,33 +117,21 @@ class WindowsServiceManager:
         print("🚀 工业现场管控平台 - 一键启动")
         print("=" * 60)
 
-        services = [
-            {
-                'name': 'MQTT代理服务',
-                'cmd': [sys.executable, 'mqtt_broker_embedded.py'],
-                'cwd': self.base_dir,
-                'delay': 2
-            },
-            {
-                'name': '后端服务',
-                'cmd': [sys.executable, 'app.py'],
-                'cwd': self.base_dir / 'backend',
-                'delay': 3
-            },
-            {
-                'name': '设备模拟器',
-                'cmd': [sys.executable, 'device_simulator.py'],
-                'cwd': self.base_dir / 'simulator',
-                'delay': 2
-            },
-            {
-                'name': 'Modbus服务器',
-                'cmd': [sys.executable, 'modbus_server.py'],
-                'cwd': self.base_dir / 'simulator',
-                'delay': 2,
-                'retry_count': 2
-            }
-        ]
+        # config/platform.json 的 start 段决定是否启动内置代理和模拟器；接真实设备时关掉它们
+        sys.path.insert(0, str(self.base_dir))
+        from platform_config import CONFIG
+        start_cfg = CONFIG.get('start', {})
+        py = sys.executable
+        services = []
+        if start_cfg.get('embedded_broker', True):
+            services.append({'name': 'MQTT代理服务', 'cmd': [py, 'mqtt_broker_embedded.py'], 'cwd': self.base_dir, 'delay': 2})
+        services.append({'name': '后端服务', 'cmd': [py, 'app.py'], 'cwd': self.base_dir / 'backend', 'delay': 3})
+        if start_cfg.get('device_simulator', True):
+            services.append({'name': '设备模拟器', 'cmd': [py, 'device_simulator.py'], 'cwd': self.base_dir / 'simulator', 'delay': 2})
+        if start_cfg.get('modbus_simulator', True):
+            services.append({'name': 'Modbus服务器', 'cmd': [py, 'modbus_server.py'], 'cwd': self.base_dir / 'simulator', 'delay': 2, 'retry_count': 2})
+        if CONFIG.get('modbus', {}).get('enabled'):
+            services.append({'name': 'Modbus采集网关', 'cmd': [py, 'modbus_gateway.py'], 'cwd': self.base_dir / 'gateway', 'delay': 2})
         
         # 启动Python服务
         success_count = 0

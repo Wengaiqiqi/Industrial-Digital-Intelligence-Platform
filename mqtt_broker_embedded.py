@@ -2,7 +2,7 @@
 """Minimal local MQTT broker for the industrial control demo.
 
 It supports the subset used by this project:
-CONNECT, DISCONNECT, SUBSCRIBE and QoS 0 PUBLISH.
+CONNECT, DISCONNECT, SUBSCRIBE and QoS 0/1/2 PUBLISH (delivered to subscribers at QoS 0).
 """
 
 import socket
@@ -85,9 +85,17 @@ class MQTTRouter:
                     break
 
                 if packet_type == 1:  # CONNECT
+                    # 按客户端声明的 keepalive 放宽读超时（规范为 1.5 倍），否则空闲客户端会被提前断开
+                    keepalive = self._parse_keepalive(payload)
+                    client_socket.settimeout(keepalive * 1.5 if keepalive else None)
                     client_socket.sendall(b"\x20\x02\x00\x00")
                 elif packet_type == 3:  # PUBLISH
-                    topic, message = self._parse_publish(payload)
+                    qos = (flags >> 1) & 0x03
+                    topic, message, packet_id = self._parse_publish(payload, qos)
+                    if qos == 1:
+                        client_socket.sendall(b"\x40\x02" + struct.pack("!H", packet_id))  # PUBACK
+                    elif qos == 2:
+                        client_socket.sendall(b"\x50\x02" + struct.pack("!H", packet_id))  # PUBREC
                     if topic:
                         logger.debug(f"MQTT publish: {topic}")
                         self._broadcast(topic, message, exclude=None)
@@ -100,6 +108,8 @@ class MQTTRouter:
                     response += struct.pack("!H", packet_id)
                     response += bytes([0] * len(topics))
                     client_socket.sendall(response)
+                elif packet_type == 6:  # PUBREL（QoS 2 第二步）
+                    client_socket.sendall(b"\x70\x02" + payload[:2])  # PUBCOMP
                 elif packet_type == 12:  # PINGREQ
                     client_socket.sendall(b"\xd0\x00")
                 elif packet_type == 14:  # DISCONNECT
@@ -145,14 +155,27 @@ class MQTTRouter:
             remaining -= len(chunk)
         return b"".join(chunks)
 
-    def _parse_publish(self, payload):
+    def _parse_keepalive(self, payload):
+        try:
+            name_len = struct.unpack("!H", payload[:2])[0]
+            pos = 2 + name_len + 2  # 协议名 + 协议级别 + 连接标志
+            return struct.unpack("!H", payload[pos:pos + 2])[0]
+        except struct.error:
+            return 60
+
+    def _parse_publish(self, payload, qos=0):
+        """QoS 1/2 的报文在主题后有 2 字节报文标识，必须去掉，否则会混进消息内容"""
         if len(payload) < 2:
-            return None, b""
+            return None, b"", 0
         topic_len = struct.unpack("!H", payload[:2])[0]
         topic_start = 2
         topic_end = topic_start + topic_len
         topic = payload[topic_start:topic_end].decode("utf-8", errors="replace")
-        return topic, payload[topic_end:]
+        packet_id = 0
+        if qos:
+            packet_id = struct.unpack("!H", payload[topic_end:topic_end + 2])[0]
+            topic_end += 2
+        return topic, payload[topic_end:], packet_id
 
     def _parse_subscribe(self, payload):
         if len(payload) < 2:

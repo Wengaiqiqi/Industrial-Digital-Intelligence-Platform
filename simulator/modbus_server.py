@@ -12,7 +12,7 @@ except ImportError:
         from pymodbus.device import ModbusDeviceIdentification
     except ImportError:
         ModbusDeviceIdentification = None
-from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext
+from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext, ModbusSlaveContext
 import threading
 import time
 import random
@@ -39,13 +39,14 @@ class ModbusPLCSimulator:
         # 保持寄存器（Holding Registers）- 模拟输出
         holding_registers = ModbusSequentialDataBlock(0, [0] * 100)
         
-        # 在pymodbus 3.x中，需要创建一个包含所有数据块的字典
-        store = {
-            'di': discrete_inputs,     # 离散输入
-            'co': coils,              # 线圈
-            'hr': holding_registers,  # 保持寄存器
-            'ir': input_registers     # 输入寄存器
-        }
+        # zero_mode=True：请求地址 0 就是数据块地址 0，与下面注释里的寄存器地址一致
+        store = ModbusSlaveContext(
+            di=discrete_inputs,     # 离散输入
+            co=coils,               # 线圈
+            hr=holding_registers,   # 保持寄存器
+            ir=input_registers,     # 输入寄存器
+            zero_mode=True
+        )
         
         # 创建服务器上下文，使用单一上下文模式
         self.context = ModbusServerContext(slaves=store, single=True)

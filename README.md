@@ -205,6 +205,11 @@ cd simulator
 ```
 
 ```bat
+cd gateway
+..\.conda-py311\python.exe modbus_gateway.py
+```
+
+```bat
 cd frontend
 npm run dev
 ```
@@ -304,6 +309,17 @@ industrial/device/<device_name>
 industrial/control/<device_name>
 ```
 
+连接地址、账号密码、TLS、主题都在 `config/platform.json` 的 `mqtt` 段配置，断线会自动重连。
+
+### 接入真实设备
+
+`config/platform.json` 是唯一的配置入口，可以配置 MQTT 代理、设备阈值、离线超时、接口令牌，以及 Modbus 寄存器映射。
+
+- 能发 MQTT 的设备或网关：按约定格式发到 `industrial/device/<设备名>` 或 `industrial/sensors/data`。
+- Modbus TCP 的 PLC：配置寄存器映射后，由 `gateway/modbus_gateway.py` 轮询并转发，控制指令会写回 PLC。
+
+报文格式、阈值报警、离线判断、控制下发和令牌的完整说明见 [docs/接入真实设备.md](docs/接入真实设备.md)。
+
 ### Modbus TCP
 
 Modbus PLC 仿真器默认监听：
@@ -389,7 +405,7 @@ ml_models/*.h5
 - 增加用户登录、角色权限和操作审计。
 - 将 SQLite 替换为 PostgreSQL 或 TimescaleDB。
 - 引入 WebSocket 或 Socket.IO 推送实时数据。
-- 支持真实 MQTT Broker、真实 PLC 和 OPC UA 数据接入。
+- 支持 OPC UA 数据接入。
 - 增加 Docker Compose 部署方案。
 - 增加单元测试、接口测试和前端 E2E 测试。
 - 将 3D 场景与实时设备状态深度绑定，实现更完整的数字孪生展示。

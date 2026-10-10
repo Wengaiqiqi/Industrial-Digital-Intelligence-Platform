@@ -16,6 +16,11 @@ import sys
 from loguru import logger
 import pandas as pd
 from sqlalchemy import desc
+import hmac
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from platform_config import CONFIG, create_mqtt_client, mqtt_address, parse_timestamp
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -24,15 +29,36 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "../database/industrial.db")}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'industrial-control-platform-2025'
+# MQTT 线程、离线检测线程和接口线程会同时写库，等待锁而不是立即报 database is locked
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'timeout': 15}}
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
 
 # 初始化扩展
 db = SQLAlchemy(app)
-CORS(app)
+CORS(app, origins=CONFIG.get('cors_origins', '*'))
 
 # MQTT客户端全局变量
 mqtt_client = None
+mqtt_connected = False
 latest_device_data = {}  # 存储最新的设备数据
+alarm_active = {}  # 设备当前是否处于越限状态，只在进入越限时记一次报警
+DEVICE_CONFIG = CONFIG.get('devices', {})
+OFFLINE_TIMEOUT = int(CONFIG.get('offline_timeout_seconds', 30))
+API_TOKEN = CONFIG.get('api_token') or ''
+
+
+@app.before_request
+def check_api_token():
+    """配置了 api_token 时，除健康检查外的接口都需要令牌（请求头 X-API-Token 或 Authorization: Bearer）"""
+    if not API_TOKEN or request.method == 'OPTIONS' or request.path == '/api/health':
+        return None
+    token = request.headers.get('X-API-Token', '')
+    auth = request.headers.get('Authorization', '')
+    if not token and auth.startswith('Bearer '):
+        token = auth[7:]
+    if not hmac.compare_digest(token, API_TOKEN):
+        return jsonify({'success': False, 'error': '未授权：缺少或错误的 API 令牌'}), 401
+    return None
 
 # 数据模型
 class SensorData(db.Model):
@@ -160,8 +186,8 @@ def get_realtime_devices():
                 'timestamp': datetime.now().isoformat()
             })
         
-        # 否则从数据库获取最新数据
-        devices = []
+        # 否则从数据库获取最新数据（与缓存同样按设备名返回）
+        devices = {}
         device_names = db.session.query(DeviceStatus.device_name).distinct().all()
         
         for (device_name,) in device_names:
@@ -171,15 +197,13 @@ def get_realtime_devices():
             device_status = DeviceStatus.query.filter_by(device_name=device_name).first()
             
             if latest_data:
-                device_info = {
-                    'device_name': device_name,
+                devices[device_name] = {
                     'value': latest_data.value,
                     'unit': latest_data.unit,
                     'type': latest_data.device_type,
                     'status': device_status.status if device_status else 'unknown',
                     'timestamp': latest_data.to_dict()['timestamp']
                 }
-                devices.append(device_info)
         
         return jsonify({
             'success': True,
@@ -355,20 +379,28 @@ def control_device():
         if device.status == 'offline':
             return jsonify({'success': False, 'error': '设备离线，无法控制'}), 400
         
-        # 这里应该实际发送控制命令到设备
-        # 目前只是模拟，实际实现需要根据具体的设备通信协议
-        logger.info(f"向设备 {device_name} 发送控制命令: {command}={value}")
-        
-        # 模拟控制成功，更新设备状态
-        device.last_update = datetime.now()
-        if command == 'set_value' and value is not None:
-            device.last_value = float(value)
-        
-        db.session.commit()
-        
+        if command not in ('set_value', 'set_status'):
+            return jsonify({'success': False, 'error': f'不支持的命令: {command}'}), 400
+        if command == 'set_value':
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'set_value 需要数值'}), 400
+
+        # 通过 MQTT 下发到 <topic_control_prefix>/<设备名>，由设备、网关或 Modbus 网关执行。
+        # 设备的实际值以之后上报的数据为准，这里不直接改库。
+        if not mqtt_client or not mqtt_connected:
+            return jsonify({'success': False, 'error': 'MQTT 未连接，控制命令无法下发'}), 503
+        topic = f"{CONFIG['mqtt']['topic_control_prefix']}/{device_name}"
+        payload = json.dumps({'command': command, 'value': value, 'timestamp': datetime.now().isoformat()}, ensure_ascii=False)
+        info = mqtt_client.publish(topic, payload, qos=1)
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            return jsonify({'success': False, 'error': f'控制命令发送失败 (rc={info.rc})'}), 502
+        logger.info(f"已下发控制命令 {topic}: {command}={value}")
+
         return jsonify({
             'success': True,
-            'message': f'设备 {device_name} 控制成功',
+            'message': f'控制命令已下发到设备 {device_name}',
             'command': command,
             'value': value
         })
@@ -775,20 +807,18 @@ def delete_device(device_name):
         if not device:
             return jsonify({'success': False, 'error': f'设备 {device_name} 不存在'}), 404
         
-        # 删除设备状态记录
+        # 只删除设备状态记录；历史数据保留，供追溯和模型训练使用（与前端提示一致）。
+        # 设备若仍在上报，下一条数据会重新登记它。
         db.session.delete(device)
-        
-        # 删除所有相关的传感器数据记录
-        sensor_data_count = SensorData.query.filter_by(device_name=device_name).count()
-        SensorData.query.filter_by(device_name=device_name).delete()
-        
         db.session.commit()
-        logger.info(f"成功删除设备: {device_name}, 删除了 {sensor_data_count} 条历史数据")
-        
+        latest_device_data.pop(device_name, None)
+        alarm_active.pop(device_name, None)
+        logger.info(f"成功删除设备: {device_name}（历史数据已保留）")
+
         return jsonify({
             'success': True,
             'message': f'设备 {device_name} 删除成功',
-            'deleted_records': sensor_data_count
+            'deleted_records': 0
         })
         
     except Exception as e:
@@ -797,136 +827,227 @@ def delete_device(device_name):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # MQTT处理函数
+# 接入约定（详见 docs/接入真实设备.md）：
+#   批量：<topic_batch>            {"timestamp": ..., "devices": {"设备名": {"value": 1.2, "unit": "...", ...}}}
+#   单台：<topic_device_prefix>/设备名  {"value": 1.2, ...}，或直接是一个数字
+#   控制：<topic_control_prefix>/设备名 {"command": "set_value", "value": 1500}（后端发布）
+DEVICE_STATUSES = ('online', 'offline', 'warning', 'maintenance')
+last_seen = {}  # 设备最近一次收到数据的本机时间，用于离线判断（不受设备时钟偏差影响）
+
+
 def setup_mqtt():
-    """设置MQTT客户端"""
+    """按配置连接 MQTT 代理；连不上会在后台持续重试，断线自动重连"""
     global mqtt_client
-    try:
-        # 兼容不同版本的paho-mqtt
-        try:
-            mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-        except (AttributeError, TypeError):
-            mqtt_client = mqtt.Client()
-            
-        mqtt_client.on_connect = on_mqtt_connect
-        mqtt_client.on_message = on_mqtt_message
-        
-        # 尝试连接MQTT代理
-        mqtt_client.connect("localhost", 1883, 60)
-        mqtt_client.loop_start()
-        logger.info("后端MQTT客户端连接成功")
-        
-    except Exception as e:
-        logger.warning(f"MQTT连接失败: {e}")
-        mqtt_client = None
+    mqtt_client = create_mqtt_client('backend', mqtt)
+    mqtt_client.on_connect = on_mqtt_connect
+    mqtt_client.on_disconnect = on_mqtt_disconnect
+    mqtt_client.on_message = on_mqtt_message
+    host, port, keepalive = mqtt_address()
+    mqtt_client.connect_async(host, port, keepalive)
+    mqtt_client.loop_start()
+    logger.info(f"正在连接 MQTT 代理 {host}:{port}（连不上会自动重试）")
+
 
 def on_mqtt_connect(client, userdata, flags, rc, properties=None):
     """MQTT连接回调"""
+    global mqtt_connected
     if rc == 0:
+        mqtt_connected = True
         logger.info("后端MQTT连接成功")
-        # 订阅设备数据主题
-        client.subscribe("industrial/sensors/data")
-        client.subscribe("industrial/device/+")
+        mqtt_cfg = CONFIG['mqtt']
+        client.subscribe(mqtt_cfg['topic_batch'], qos=1)
+        client.subscribe(f"{mqtt_cfg['topic_device_prefix']}/+", qos=1)
+    elif rc in (4, 5):
+        logger.error(f"MQTT 认证失败（错误码 {rc}），请检查 config/platform.json 或 MQTT_USERNAME / MQTT_PASSWORD")
     else:
         logger.error(f"MQTT连接失败，错误码: {rc}")
+
+
+def on_mqtt_disconnect(client, userdata, rc, *args):
+    global mqtt_connected
+    mqtt_connected = False
+    if rc != 0:
+        logger.warning(f"MQTT 连接断开（rc={rc}），正在自动重连...")
+
+
+def decode_payload(raw_bytes):
+    """JSON 优先；纯数字文本也接受"""
+    text = raw_bytes.decode('utf-8', errors='replace').strip()
+    try:
+        return json.loads(text)
+    except ValueError:
+        return float(text)
+
 
 def on_mqtt_message(client, userdata, msg):
     """MQTT消息处理"""
     try:
+        mqtt_cfg = CONFIG['mqtt']
         topic = msg.topic
-        payload = json.loads(msg.payload.decode())
-        
-        if topic == "industrial/sensors/data":
-            # 处理完整的设备数据包
-            process_device_data_batch(payload)
-        elif topic.startswith("industrial/device/"):
-            # 处理单个设备数据
-            device_name = topic.split('/')[-1]
-            process_single_device_data(device_name, payload)
-            
-    except Exception as e:
-        logger.error(f"处理MQTT消息失败: {e}")
+        payload = decode_payload(msg.payload)
 
-def process_device_data_batch(data_packet):
-    """处理批量设备数据"""
-    global latest_device_data
-    
+        if topic == mqtt_cfg['topic_batch']:
+            if not isinstance(payload, dict) or not isinstance(payload.get('devices'), dict):
+                logger.warning(f"忽略格式错误的批量报文: {topic}")
+                return
+            ingest_readings(payload['devices'], payload.get('timestamp'))
+        elif topic.startswith(mqtt_cfg['topic_device_prefix'] + '/'):
+            device_name = topic[len(mqtt_cfg['topic_device_prefix']) + 1:]
+            ingest_readings({device_name: payload}, None)
+
+    except Exception as e:
+        logger.error(f"处理MQTT消息失败 ({msg.topic}): {e}")
+
+
+def normalize_value(value):
+    """把上报值转成有限的浮点数；布尔量转 0/1；无效返回 None"""
+    if isinstance(value, bool):
+        return float(value)
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if value == value and abs(value) != float('inf') else None
+
+
+def ingest_readings(readings, packet_timestamp):
+    """入库、更新设备状态、按阈值报警。逐台校验，坏数据只丢弃那一台。"""
     with app.app_context():
         try:
-            timestamp = datetime.fromisoformat(data_packet['timestamp'].replace('Z', '+00:00'))
-            devices = data_packet.get('devices', {})
-            
-            # 更新最新设备数据缓存
-            latest_device_data.update(devices)
-            
-            
-            # 批量插入数据库
-            sensor_records = []
-            device_status_updates = []
-            alarm_records = []
-            
-            for device_name, device_data in devices.items():
-                # 准备传感器数据记录
-                sensor_record = SensorData(
+            received_at = datetime.now()
+            packet_ts = parse_timestamp(packet_timestamp) if packet_timestamp is not None else received_at
+            stored = 0
+
+            for device_name, data in readings.items():
+                if not isinstance(device_name, str) or not device_name or len(device_name) > 100 or '/' in device_name:
+                    logger.warning(f"忽略非法设备名: {device_name!r}")
+                    continue
+                if not isinstance(data, dict):
+                    data = {'value': data}
+                value = normalize_value(data.get('value'))
+                if value is None:
+                    logger.warning(f"忽略设备 {device_name} 的无效数值: {data.get('value')!r}")
+                    continue
+
+                cfg = DEVICE_CONFIG.get(device_name, {})
+                timestamp = parse_timestamp(data['timestamp']) if data.get('timestamp') is not None else packet_ts
+                device_type = str(data.get('type') or cfg.get('type') or 'unknown')[:50]
+                unit = str(data.get('unit') or cfg.get('unit') or '')[:20]
+
+                # 报警以后端配置的阈值为准；设备自带的 alarm 标志也认
+                alarm_min, alarm_max = cfg.get('alarm_min'), cfg.get('alarm_max')
+                below = alarm_min is not None and value < alarm_min
+                above = alarm_max is not None and value > alarm_max
+                alarming = below or above or bool(data.get('alarm'))
+                reported = data.get('status')
+                status = 'warning' if alarming else (reported if reported in DEVICE_STATUSES else 'online')
+
+                db.session.add(SensorData(
                     device_name=device_name,
-                    device_type=device_data.get('type', 'unknown'),
-                    value=device_data['value'],
-                    unit=device_data.get('unit', ''),
+                    device_type=device_type,
+                    value=value,
+                    unit=unit,
                     timestamp=timestamp,
-                    is_anomaly=device_data.get('alarm', False),
-                    status=device_data.get('status', 'normal')
-                )
-                sensor_records.append(sensor_record)
-                  # 更新设备状态
+                    is_anomaly=alarming,
+                    status='alarm' if alarming else 'normal'
+                ))
+
                 device_status = DeviceStatus.query.filter_by(device_name=device_name).first()
                 if device_status:
-                    device_status.last_value = device_data['value']
-                    device_status.status = device_data.get('status', 'online')
+                    # 运行时长按真实的上报间隔累加；断线期间不计
+                    if device_status.status != 'offline' and device_status.last_update:
+                        delta = (timestamp - device_status.last_update).total_seconds()
+                        if 0 < delta <= OFFLINE_TIMEOUT:
+                            device_status.total_runtime = (device_status.total_runtime or 0) + int(round(delta))
+                    device_status.last_value = value
+                    device_status.status = status
                     device_status.last_update = timestamp
-                    device_status.total_runtime += 2  # 2秒增量
+                    device_status.unit = unit or device_status.unit
+                    if device_status.device_type == 'unknown' and device_type != 'unknown':
+                        device_status.device_type = device_type
                 else:
-                    # 创建新设备状态记录
-                    device_status = DeviceStatus(
+                    db.session.add(DeviceStatus(
                         device_name=device_name,
-                        device_type=device_data.get('type', 'unknown'),
-                        status=device_data.get('status', 'online'),
-                        last_value=device_data['value'],
-                        unit=device_data.get('unit', ''),
+                        device_type=device_type,
+                        status=status,
+                        last_value=value,
+                        unit=unit,
                         last_update=timestamp,
                         total_runtime=0
-                    )
-                    db.session.add(device_status)
-                
-                # 检查并创建报警记录
-                if device_data.get('alarm', False):
-                    alarm_record = AlarmRecord(
+                    ))
+
+                # 只在进入越限状态时记一条报警，避免持续越限时每个周期都刷屏
+                if alarming and not alarm_active.get(device_name):
+                    threshold = alarm_max if above else alarm_min if below else None
+                    detail = f"高于上限 {alarm_max}" if above else f"低于下限 {alarm_min}" if below else "设备上报报警"
+                    db.session.add(AlarmRecord(
                         device_name=device_name,
                         alarm_type='threshold_exceeded',
                         severity='warning',
-                        message=f"设备 {device_name} 数值异常: {device_data['value']} {device_data.get('unit', '')}",
-                        value=device_data['value'],
+                        message=f"设备 {device_name} 数值异常: {value:g} {unit}（{detail}）",
+                        value=value,
+                        threshold=threshold,
                         timestamp=timestamp
-                    )
-                    alarm_records.append(alarm_record)
-            
-            # 批量提交到数据库
-            if sensor_records:
-                db.session.add_all(sensor_records)
-            if alarm_records:
-                db.session.add_all(alarm_records)
-            
+                    ))
+                alarm_active[device_name] = alarming
+
+                last_seen[device_name] = received_at
+                latest_device_data[device_name] = {
+                    'value': value,
+                    'unit': unit,
+                    'type': device_type,
+                    'status': status,
+                    'alarm': alarming,
+                    'timestamp': timestamp.isoformat()
+                }
+                stored += 1
+
             db.session.commit()
-            logger.debug(f"成功处理 {len(devices)} 个设备的数据")
-            
+            if stored:
+                logger.debug(f"成功处理 {stored} 个设备的数据")
+
         except Exception as e:
-            logger.error(f"批量处理设备数据失败: {e}")
+            logger.error(f"处理设备数据失败: {e}")
             db.session.rollback()
 
-def process_single_device_data(device_name, device_data):
-    """处理单个设备数据"""
-    global latest_device_data
-    
-    # 更新最新设备数据缓存
-    latest_device_data[device_name] = device_data
+
+def watch_devices():
+    """后台线程：超过 offline_timeout_seconds 没有数据的设备标为离线并报警；按 retention_days 清理旧数据"""
+    retention_days = int(CONFIG.get('retention_days', 0) or 0)
+    last_cleanup = 0.0
+    while True:
+        time.sleep(5)
+        with app.app_context():
+            try:
+                now = datetime.now()
+                cutoff = now - timedelta(seconds=OFFLINE_TIMEOUT)
+                for device in DeviceStatus.query.filter(DeviceStatus.status != 'offline').all():
+                    seen = last_seen.get(device.device_name) or device.last_update
+                    if seen and seen >= cutoff:
+                        continue
+                    device.status = 'offline'
+                    alarm_active.pop(device.device_name, None)
+                    if device.device_name in latest_device_data:
+                        latest_device_data[device.device_name]['status'] = 'offline'
+                    db.session.add(AlarmRecord(
+                        device_name=device.device_name,
+                        alarm_type='device_offline',
+                        severity='critical',
+                        message=f"设备 {device.device_name} 已离线：超过 {OFFLINE_TIMEOUT} 秒没有收到数据",
+                        timestamp=now
+                    ))
+                    logger.warning(f"设备 {device.device_name} 离线")
+
+                if retention_days > 0 and time.time() - last_cleanup > 3600:
+                    last_cleanup = time.time()
+                    deleted = SensorData.query.filter(SensorData.timestamp < now - timedelta(days=retention_days)).delete()
+                    if deleted:
+                        logger.info(f"已清理 {deleted} 条超过 {retention_days} 天的历史数据")
+
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"设备状态巡检失败: {e}")
+                db.session.rollback()
 
 # 数据库初始化
 def init_database():
@@ -945,4 +1066,5 @@ if __name__ == "__main__":
     init_database()
     logger.info("启动工业现场管控平台后端服务...")
     setup_mqtt()  # 启动MQTT客户端
+    threading.Thread(target=watch_devices, daemon=True, name='device-watchdog').start()
     app.run(host='0.0.0.0', port=5055, debug=False, use_reloader=False)
