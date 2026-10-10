@@ -188,7 +188,7 @@ onMounted(() => {
 
     h2 {
       margin: 0;
-      color: #081F5C;
+      color: var(--ink);
     }
 
     .header-actions {
@@ -213,28 +213,28 @@ onMounted(() => {
 
         .stat-label {
           font-size: 14px;
-          color: #334EAC;
+          color: var(--data);
         }
       }      &.critical .stat-number {
-        color: #081F5C;
+        color: var(--ink);
       }
 
       &.high .stat-number {
-        color: #7096D1;
+        color: var(--data-2);
       }
 
       &.medium .stat-number {
-        color: #334EAC;
+        color: var(--data);
       }      &.warning .stat-number {
-        color: #7096D1;
+        color: var(--data-2);
       }
 
       &.total .stat-number {
-        color: #7096D1;
+        color: var(--data-2);
       }
 
       &.unread .stat-number {
-        color: #7096D1;
+        color: var(--data-2);
       }
     }
   }

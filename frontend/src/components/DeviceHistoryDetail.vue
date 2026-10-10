@@ -221,6 +221,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { deviceAPI } from '../api'
+import { theme, cssVar } from '../theme'
 import { Download, Search } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -278,6 +279,8 @@ watch(() => props.device, () => {
 watch(chartType, () => {
   updateChart()
 })
+
+watch(theme, () => nextTick(updateChart))
 
 // 方法
 const loadDeviceData = async () => {
@@ -391,7 +394,8 @@ const updateChart = () => {
   const option = {
     title: {
       text: `${getDeviceDisplayName(props.device.name)} 历史趋势`,
-      left: 'center'
+      left: 'center',
+      textStyle: { color: cssVar('--ink') }
     },
     tooltip: {
       trigger: 'axis',
@@ -416,15 +420,20 @@ const updateChart = () => {
     xAxis: {
       type: 'category',
       data: xData,
+      axisLine: { lineStyle: { color: cssVar('--grid') } },
       axisLabel: {
-        rotate: 45
+        rotate: 45,
+        color: cssVar('--muted')
       }
     },
     yAxis: {
       type: 'value',
       name: props.device.unit,
+      nameTextStyle: { color: cssVar('--muted') },
+      splitLine: { lineStyle: { color: cssVar('--chart-grid') } },
       axisLabel: {
-        formatter: value => formatValue(value)
+        formatter: value => formatValue(value),
+        color: cssVar('--muted')
       }
     },
     series: [{
@@ -433,7 +442,7 @@ const updateChart = () => {
       data: yData,
       smooth: chartType.value === 'line',
       itemStyle: {
-        color: '#334EAC'
+        color: cssVar('--data')
       },
       markLine: {
         data: [
@@ -554,7 +563,7 @@ const downloadChart = () => {
   const url = chart.value.getDataURL({
     type: 'png',
     pixelRatio: 2,
-    backgroundColor: '#F7F2EB'
+    backgroundColor: cssVar('--paper')
   })
   
   const link = document.createElement('a')
@@ -619,7 +628,7 @@ onMounted(() => {
 
 .info-item label {
   display: block;
-  color: #7096D1;
+  color: var(--data-2);
   font-size: 12px;
   margin-bottom: 5px;
 }
@@ -627,7 +636,7 @@ onMounted(() => {
 .info-item span {
   font-size: 14px;
   font-weight: 500;
-  color: #081F5C;
+  color: var(--ink);
 }
 
 .stats-section {
@@ -647,13 +656,13 @@ onMounted(() => {
 .stat-number {
   font-size: 20px;
   font-weight: bold;
-  color: #334EAC;
+  color: var(--data);
   margin-bottom: 5px;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #7096D1;
+  color: var(--data-2);
 }
 
 .chart-section,
@@ -690,47 +699,47 @@ onMounted(() => {
 }
 
 .value-high {
-  color: #081F5C;
+  color: var(--ink);
   font-weight: bold;
 }
 
 .value-low {
-  color: #7096D1;
+  color: var(--data-2);
   font-weight: bold;
 }
 
 .value-normal {
-  color: #7096D1;
+  color: var(--data-2);
 }
 
 .change-up {
-  color: #081F5C;
+  color: var(--ink);
 }
 
 .change-down {
-  color: #7096D1;
+  color: var(--data-2);
 }
 
 .change-none {
-  color: #7096D1;
+  color: var(--data-2);
 }
 
 .anomaly-item {
   padding: 10px;
-  background: #F7F2EB;
+  background: var(--paper);
   border-radius: 4px;
-  border-left: 4px solid #7096D1;
+  border-left: 4px solid var(--data-2);
 }
 
 .anomaly-value {
   font-weight: bold;
-  color: #7096D1;
+  color: var(--data-2);
   margin-bottom: 5px;
 }
 
 .anomaly-description {
   font-size: 12px;
-  color: #334EAC;
+  color: var(--data);
 }
 
 .more-anomalies {

@@ -123,7 +123,7 @@
                     </el-dropdown-item>
                     <el-dropdown-item 
                       :command="{ action: 'delete', device: row }"
-                      style="color: #081F5C;"
+                      style="color: var(--ink);"
                     >
                       删除设备
                     </el-dropdown-item>
@@ -848,7 +848,7 @@ onUnmounted(() => {
 
     h2 {
       margin: 0;
-      color: #081F5C;
+      color: var(--ink);
     }
 
     .header-actions {
@@ -876,23 +876,23 @@ onUnmounted(() => {
           font-size: 24px;
 
           &.online {
-            background: rgba(103, 194, 58, 0.1);
-            color: #7096D1;
+            background: var(--accent-soft);
+            color: var(--data-2);
           }
 
           &.offline {
-            background: rgba(245, 108, 108, 0.1);
-            color: #081F5C;
+            background: var(--alarm-soft);
+            color: var(--ink);
           }
 
           &.warning {
-            background: rgba(230, 162, 60, 0.1);
-            color: #7096D1;
+            background: var(--warn-soft);
+            color: var(--data-2);
           }
 
           &.total {
-            background: rgba(64, 158, 255, 0.1);
-            color: #334EAC;
+            background: var(--accent-soft);
+            color: var(--data);
           }
         }
 
@@ -900,12 +900,12 @@ onUnmounted(() => {
           .stat-number {
             font-size: 24px;
             font-weight: 600;
-            color: #081F5C;
+            color: var(--ink);
           }
 
           .stat-label {
             font-size: 14px;
-            color: #334EAC;
+            color: var(--data);
             margin-top: 4px;
           }
         }
@@ -935,14 +935,14 @@ onUnmounted(() => {
       font-weight: 500;
 
       .unit {
-        color: #7096D1;
+        color: var(--data-2);
         font-size: 12px;
         margin-left: 4px;
       }
     }
 
     .error-count {
-      color: #081F5C;
+      color: var(--ink);
       font-weight: 500;
     }
 
@@ -964,28 +964,28 @@ onUnmounted(() => {
     min-height: 96px;
     margin-bottom: 14px;
     padding: 12px 20px;
-    background: #fbf8f3;
-    border: 1px solid rgba(8, 31, 92, .14);
+    background: var(--paper-soft);
+    border: 1px solid var(--grid);
     border-radius: 10px;
   }
   .availability-copy { display: flex; align-items: flex-start; flex-direction: column; gap: 2px; align-self: center; }
   .availability-copy strong { font-size: 14px; line-height: 1.2; }
-  .availability-copy span { color: #334eac; font-size: 26px; font-weight: 800; line-height: 1.05; }
+  .availability-copy span { color: var(--data); font-size: 26px; font-weight: 800; line-height: 1.05; }
   .availability-ticks { display: flex; align-items: flex-end; justify-content: space-between; width: 100%; height: 32px; gap: 0; }
-  .availability-ticks i { width: 2px; height: 19px; background: #bad6eb; }
+  .availability-ticks i { width: 2px; height: 19px; background: var(--data-3); }
   .availability-ticks i:nth-child(3n) { height: 30px; }
-  .availability-ticks i.active { background: #334eac; }
-  .availability-axis { display: flex; justify-content: space-between; grid-column: 2; color: rgba(8, 31, 92, .58); font-size: 10px; }
-  .availability-legend { display: flex; align-items: center; justify-content: flex-end; align-self: center; gap: 16px; grid-column: 3; grid-row: 1 / 3; color: rgba(8, 31, 92, .64); font-size: 12px; }
+  .availability-ticks i.active { background: var(--data); }
+  .availability-axis { display: flex; justify-content: space-between; grid-column: 2; color: var(--muted); font-size: 10px; }
+  .availability-legend { display: flex; align-items: center; justify-content: flex-end; align-self: center; gap: 16px; grid-column: 3; grid-row: 1 / 3; color: var(--muted); font-size: 12px; }
   .availability-legend span { display: flex; align-items: center; gap: 5px; }
-  .availability-legend i { width: 2px; height: 12px; background: #bad6eb; }
-  .availability-legend i.active { background: #334eac; }
+  .availability-legend i { width: 2px; height: 12px; background: var(--data-3); }
+  .availability-legend i.active { background: var(--data); }
   .availability-legend b { font-weight: 600; }
 
   .page-header { margin-bottom: 30px; }
   .device-filter-row { display: grid; grid-template-columns: minmax(260px, 1fr) 148px 148px auto; gap: 10px; margin-bottom: 20px; }
   .device-list-card :deep(.el-card__header) { padding-block: 12px; }
-  .device-list-card .card-header small { color: rgba(8, 31, 92, .6); font-size: 12px; font-weight: 600; }
+  .device-list-card .card-header small { color: var(--muted); font-size: 12px; font-weight: 600; }
   .device-list-card :deep(.el-card__body) { padding: 0 16px 10px; }
   .device-list-card .pagination-container { margin-top: 10px; }
 
@@ -995,7 +995,7 @@ onUnmounted(() => {
       font-weight: 500;
 
       .unit {
-        color: #7096D1;
+        color: var(--data-2);
         font-size: 14px;
         margin-left: 4px;
       }
@@ -1008,7 +1008,7 @@ onUnmounted(() => {
       font-weight: 500;
 
       .unit {
-        color: #7096D1;
+        color: var(--data-2);
         font-size: 14px;
         margin-left: 4px;
       }

@@ -81,21 +81,21 @@ if (import.meta.env.DEV) console.assert(days.length === 7, 'Dot heat requires se
 
 <style scoped>
 .alarm-insights { display: grid; grid-template-columns: minmax(360px, .72fr) minmax(520px, 1fr); gap: 18px; margin-bottom: 14px; }
-.insight-panel { display: flex; flex-direction: column; min-width: 0; height: 300px; padding: 16px 20px 13px; overflow: hidden; color: #081f5c; background: #fbf8f3; border: 1px solid rgba(8, 31, 92, .14); border-radius: 10px; }
+.insight-panel { display: flex; flex-direction: column; min-width: 0; height: 300px; padding: 16px 20px 13px; overflow: hidden; color: var(--ink); background: var(--paper-soft); border: 1px solid var(--grid); border-radius: 10px; }
 h3 { margin: 0; font-size: 18px; font-weight: 800; }
-.sub { margin: 6px 0 12px; color: rgba(8, 31, 92, .62); font-size: 12px; }
+.sub { margin: 6px 0 12px; color: var(--muted); font-size: 12px; }
 .tick-rows { display: grid; align-content: center; flex: 1; gap: 12px; min-height: 0; }
 .tick-row { display: grid; grid-template-columns: 86px minmax(0, 1fr) 28px; align-items: center; gap: 12px; }
-.row-label { overflow: hidden; color: rgba(8, 31, 92, .78); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.row-track { display: flex; align-items: center; height: 20px; gap: 5px; border-bottom: 1px solid rgba(8, 31, 92, .12); }
-.row-track i { display: block; width: 2px; height: 14px; background: #334eac; }
-.row-track i.major { height: 19px; background: #081f5c; }
+.row-label { overflow: hidden; color: var(--muted); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.row-track { display: flex; align-items: center; height: 20px; gap: 5px; border-bottom: 1px solid var(--grid); }
+.row-track i { display: block; width: 2px; height: 14px; background: var(--data); }
+.row-track i.major { height: 19px; background: var(--ink); }
 .tick-row strong { font-size: 14px; font-variant-numeric: tabular-nums; }
 svg { display: block; width: 100%; height: 100%; min-height: 0; flex: 1; }
-svg text { fill: rgba(8, 31, 92, .6); font-size: clamp(11px, 1vw, 14px); font-weight: 650; }
-circle.quiet { fill: #bad6eb; }
-circle.warm { fill: #7096d1; }
-circle.hot { fill: #081f5c; }
-.source { margin-top: 6px; color: rgba(8, 31, 92, .5); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
+svg text { fill: var(--muted); font-size: clamp(11px, 1vw, 14px); font-weight: 650; }
+circle.quiet { fill: var(--data-3); }
+circle.warm { fill: var(--data-2); }
+circle.hot { fill: var(--ink); }
+.source { margin-top: 6px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 @media (max-width: 1280px) { .alarm-insights { grid-template-columns: 1fr 1.2fr; } }
 </style>

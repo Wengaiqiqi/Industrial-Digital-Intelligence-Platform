@@ -80,28 +80,28 @@ if (import.meta.env.DEV) console.assert(values.length === 24, 'Lieflat overview 
 
 <style scoped>
 .lieflat-overview { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(360px, 1fr); gap: 18px; margin-bottom: 18px; }
-.lieflat-panel { display: flex; flex-direction: column; min-width: 0; height: 380px; padding: 20px 22px 16px; overflow: hidden; color: #081f5c; background: #fbf8f3; border: 1px solid rgba(8, 31, 92, .14); border-radius: 10px; }
-.chart-kicker { margin-bottom: 6px; color: rgba(8, 31, 92, .62); font-size: 13px; font-weight: 750; letter-spacing: .06em; }
+.lieflat-panel { display: flex; flex-direction: column; min-width: 0; height: 380px; padding: 20px 22px 16px; overflow: hidden; color: var(--ink); background: var(--paper-soft); border: 1px solid var(--grid); border-radius: 10px; }
+.chart-kicker { margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 750; letter-spacing: .06em; }
 h3 { margin: 0; font-size: 19px; font-weight: 800; }
-.chart-sub { margin-top: 5px; color: rgba(8, 31, 92, .58); font-size: 11px; }
+.chart-sub { margin-top: 5px; color: var(--muted); font-size: 11px; }
 svg { display: block; width: 100%; min-height: 0; flex: 1; margin-top: 3px; }
 .trend-panel svg { margin-top: -4px; }
-.chart-grid line { stroke: rgba(8, 31, 92, .1); stroke-width: .8; }
-.chart-grid text, .axis-label { fill: rgba(8, 31, 92, .58); font-size: 10px; font-weight: 650; }
-.calendar-floor { stroke: rgba(8, 31, 92, .2); stroke-width: .8; }
-.calendar-tick { stroke: rgba(8, 31, 92, .18); stroke-width: .8; }
-.trend-line { fill: none; stroke: #334eac; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
-.data-point { fill: #fbf8f3; stroke: #334eac; stroke-width: 1.5; }
-.current-point { fill: #081f5c; stroke: #081f5c; }
-.peak-label { fill: #081f5c; font-size: 12px; font-weight: 800; paint-order: stroke; stroke: #fbf8f3; stroke-width: 4px; }
-.chart-source { margin-top: 2px; color: rgba(8, 31, 92, .62); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.chart-grid line { stroke: var(--grid); stroke-width: .8; }
+.chart-grid text, .axis-label { fill: var(--muted); font-size: 10px; font-weight: 650; }
+.calendar-floor { stroke: var(--grid); stroke-width: .8; }
+.calendar-tick { stroke: var(--grid); stroke-width: .8; }
+.trend-line { fill: none; stroke: var(--data); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+.data-point { fill: var(--paper-soft); stroke: var(--data); stroke-width: 1.5; }
+.current-point { fill: var(--ink); stroke: var(--ink); }
+.peak-label { fill: var(--ink); font-size: 12px; font-weight: 800; paint-order: stroke; stroke: var(--paper-soft); stroke-width: 4px; }
+.chart-source { margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .gauge-spacer { height: 14px; }
 .gauge-panel svg { min-height: 252px; margin-top: -4px; }
-.gauge-tick { stroke: #bad6eb; stroke-width: 1.3; }
-.gauge-tick.active { stroke: #334eac; stroke-width: 2; }
-.gauge-value { fill: #081f5c; font-size: 30px; font-weight: 800; }
-.gauge-caption { fill: rgba(8, 31, 92, .62); font-size: 11px; font-weight: 700; }
-.gauge-side-label { fill: #334eac; font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-.gauge-meta { display: flex; justify-content: center; gap: 28px; margin-top: 0; color: #081f5c; font-size: 12px; }
+.gauge-tick { stroke: var(--data-3); stroke-width: 1.3; }
+.gauge-tick.active { stroke: var(--data); stroke-width: 2; }
+.gauge-value { fill: var(--ink); font-size: 30px; font-weight: 800; }
+.gauge-caption { fill: var(--muted); font-size: 11px; font-weight: 700; }
+.gauge-side-label { fill: var(--data); font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.gauge-meta { display: flex; justify-content: center; gap: 28px; margin-top: 0; color: var(--ink); font-size: 12px; }
 @media (max-width: 1320px) { .lieflat-overview { grid-template-columns: minmax(0, 1.65fr) minmax(260px, .8fr); } }
 </style>

@@ -112,7 +112,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { theme, cssVar } from '../theme'
 import { useDeviceStore } from '../stores/device'
 import { useAlarmStore } from '../stores/alarm'
 import LieflatOverview from '../components/LieflatOverview.vue'
@@ -250,8 +251,12 @@ function formatRuntime(runtime) {
   return deviceStore.formatRuntime(runtime)
 }
 
+let chartDevice = null
+watch(theme, () => chartDevice && nextTick(() => loadDeviceChart(chartDevice)))
+
 async function loadDeviceChart(deviceName) {
   if (!deviceChartRef.value) return
+  chartDevice = deviceName
   
   try {
     // 获取设备历史数据
@@ -281,14 +286,14 @@ async function loadDeviceChart(deviceName) {
         type: 'category',
         data: times,
         boundaryGap: false,
-        axisLine: { lineStyle: { color: 'rgba(8,31,92,.18)' } },
-        axisTick: { lineStyle: { color: 'rgba(8,31,92,.18)' } },
-        axisLabel: { color: 'rgba(8,31,92,.62)' }
+        axisLine: { lineStyle: { color: cssVar('--grid') } },
+        axisTick: { lineStyle: { color: cssVar('--grid') } },
+        axisLabel: { color: cssVar('--muted') }
       },
       yAxis: {
         type: 'value',
-        splitLine: { lineStyle: { color: 'rgba(8,31,92,.10)' } },
-        axisLabel: { color: 'rgba(8,31,92,.62)' }
+        splitLine: { lineStyle: { color: cssVar('--chart-grid') } },
+        axisLabel: { color: cssVar('--muted') }
       },
       series: [{
         name: '历史数据',
@@ -299,10 +304,10 @@ async function loadDeviceChart(deviceName) {
         showAllSymbol: values.length <= 30,
         data: values,
         lineStyle: {
-          color: '#334EAC',
+          color: cssVar('--data'),
           width: 1.8
         },
-        itemStyle: { color: '#F7F2EB', borderColor: '#334EAC', borderWidth: 1.5 }
+        itemStyle: { color: cssVar('--paper-soft'), borderColor: cssVar('--data'), borderWidth: 1.5 }
       }]
     }
     
@@ -404,38 +409,38 @@ onUnmounted(() => {
         font-size: 24px;
         
         &.online {
-          color: #7096D1;
+          color: var(--data-2);
         }
         
         &.warning {
-          color: #7096D1;
+          color: var(--data-2);
         }
         
         &.alarm {
-          color: #081F5C;
+          color: var(--ink);
         }
         
         &.efficiency {
-          color: #334EAC;
+          color: var(--data);
         }
       }
 
       .stat-title {
         font-size: 14px;
-        color: #334EAC;
+        color: var(--data);
       }
     }
 
     .stat-value {
       font-size: 32px;
       font-weight: 600;
-      color: #081F5C;
+      color: var(--ink);
       margin: 10px 0;
     }
 
     .stat-description {
       font-size: 12px;
-      color: #7096D1;
+      color: var(--data-2);
     }
   }
 
@@ -463,14 +468,14 @@ onUnmounted(() => {
 
     .device-item {
       padding: 15px;
-      border: 1px solid #BAD6EB;
+      border: 1px solid var(--data-3);
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.3s ease;
 
       &:hover {
-        border-color: #334EAC;
-        box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+        border-color: var(--data);
+        box-shadow: 0 2px 8px var(--accent-soft);
       }
 
       .device-header {
@@ -491,19 +496,19 @@ onUnmounted(() => {
         .value {
           font-size: 20px;
           font-weight: 600;
-          color: #334EAC;
+          color: var(--data);
         }
 
         .unit {
           font-size: 12px;
-          color: #7096D1;
+          color: var(--data-2);
           margin-left: 4px;
         }
       }
 
       .device-type {
         font-size: 12px;
-        color: #334EAC;
+        color: var(--data);
       }
     }
   }
@@ -523,7 +528,7 @@ onUnmounted(() => {
       justify-content: space-between;
       align-items: center;
       padding: 10px 0;
-      border-bottom: 1px solid #F7F2EB;
+      border-bottom: 1px solid var(--paper);
 
       &:last-child {
         border-bottom: none;
@@ -531,13 +536,13 @@ onUnmounted(() => {
 
       .label {
         font-size: 14px;
-        color: #334EAC;
+        color: var(--data);
       }
 
       .value {
         font-size: 14px;
         font-weight: 500;
-        color: #081F5C;
+        color: var(--ink);
       }    }
   }
 

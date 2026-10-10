@@ -34,14 +34,14 @@ export default {
 
 .page-header h2 {
   margin: 0 0 10px 0;
-  color: #081F5C;
+  color: var(--ink);
   font-size: 28px;
   font-weight: 600;
 }
 
 .page-header p {
   margin: 0;
-  color: #7096D1;
+  color: var(--data-2);
   font-size: 16px;
 }
 </style>

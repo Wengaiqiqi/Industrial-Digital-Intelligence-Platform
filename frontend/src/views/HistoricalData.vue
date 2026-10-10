@@ -291,7 +291,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { theme, cssVar } from '../theme'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { historicalAPI, deviceAPI } from '../api'
@@ -672,6 +673,8 @@ function calculateStatistics(apiResponse) {
   }
 }
 
+watch(theme, () => renderMiniCharts())
+
 function renderMiniCharts() {
   // 等待DOM更新
   nextTick(() => {
@@ -712,7 +715,7 @@ function renderMiniCharts() {
               type: 'line',
               symbol: 'none',
               lineStyle: {
-                color: device.name.includes('sensor') ? '#334EAC' : '#7096D1',
+                color: cssVar(device.name.includes('sensor') ? '--data' : '--data-2'),
                 width: 2
               },
               data: device.values.slice(-20)
@@ -783,11 +786,11 @@ onMounted(() => {
   }
 
   .history-tabs { display: flex; align-items: center; gap: 24px; }
-  .history-tab { position: relative; min-height: 36px; padding: 0 2px; color: rgba(8, 31, 92, .58); background: transparent; border: 0; cursor: pointer; font-size: 14px; font-weight: 700; }
+  .history-tab { position: relative; min-height: 36px; padding: 0 2px; color: var(--muted); background: transparent; border: 0; cursor: pointer; font-size: 14px; font-weight: 700; }
   .history-tab::after { position: absolute; right: 0; bottom: -12px; left: 0; height: 2px; background: transparent; content: ''; }
-  .history-tab:hover, .history-tab:focus-visible, .history-tab.active { color: #334eac; }
-  .history-tab.active::after { background: #334eac; }
-  .history-tab:focus-visible { outline: 2px solid rgba(51, 78, 172, .35); outline-offset: 3px; }
+  .history-tab:hover, .history-tab:focus-visible, .history-tab.active { color: var(--data); }
+  .history-tab.active::after { background: var(--data); }
+  .history-tab:focus-visible { outline: 2px solid var(--data-3); outline-offset: 3px; }
   .history-records-card :deep(.el-card__header) { padding-block: 12px; }
   .history-records-card :deep(.el-card__body) { padding: 0 16px 12px; }
   .history-table-wrap { height: clamp(300px, calc(100vh - 660px), 440px); }
@@ -803,7 +806,7 @@ onMounted(() => {
 
     h2 {
       margin: 0;
-      color: #081F5C;
+      color: var(--ink);
     }
 
     .header-controls {
@@ -832,23 +835,23 @@ onMounted(() => {
           font-size: 24px;
 
           &.total {
-            background: #334EAC;
-            color: white;
+            background: var(--data);
+            color: var(--on-accent);
           }
 
           &.devices {
-            background: #081F5C;
-            color: white;
+            background: var(--accent-soft);
+            color: var(--data-2);
           }
 
           &.time {
-            background: #7096D1;
-            color: white;
+            background: var(--data-2);
+            color: var(--on-accent);
           }
 
           &.anomaly {
-            background: #BAD6EB;
-            color: #081F5C;
+            background: var(--data-3);
+            color: var(--ink);
           }
         }
 
@@ -856,13 +859,13 @@ onMounted(() => {
           .stat-number {
             font-size: 28px;
             font-weight: bold;
-            color: #081F5C;
+            color: var(--ink);
             line-height: 1;
           }
 
           .stat-label {
             font-size: 14px;
-            color: #7096D1;
+            color: var(--data-2);
             margin-top: 5px;
           }
         }
@@ -890,26 +893,26 @@ onMounted(() => {
             font-size: 20px;
 
             &.sensors {
-              color: #334EAC;
+              color: var(--data);
             }
 
             &.actuators {
-              color: #7096D1;
+              color: var(--data-2);
             }
 
             &.indicators {
-              color: #7096D1;
+              color: var(--data-2);
             }
 
             &.io {
-              color: #081F5C;
+              color: var(--ink);
             }
           }
         }
       }
 
       .device-card {
-        border: 1px solid #BAD6EB;
+        border: 1px solid var(--data-3);
         border-radius: 8px;
         padding: 15px;
         cursor: pointer;
@@ -924,11 +927,11 @@ onMounted(() => {
         }
 
         &.sensor-card {
-          border-left: 4px solid #334EAC;
+          border-left: 4px solid var(--data);
         }
 
         &.actuator-card {
-          border-left: 4px solid #7096D1;
+          border-left: 4px solid var(--data-2);
         }
 
         .device-header {
@@ -939,7 +942,7 @@ onMounted(() => {
 
           .device-name {
             font-weight: 600;
-            color: #081F5C;
+            color: var(--ink);
           }
         }
 
@@ -955,12 +958,12 @@ onMounted(() => {
             font-size: 14px;
 
             .label {
-              color: #7096D1;
+              color: var(--data-2);
             }
 
             .value {
               font-weight: 500;
-              color: #081F5C;
+              color: var(--ink);
             }
           }
         }
@@ -976,17 +979,17 @@ onMounted(() => {
         }
       }      .indicator-item,
       .io-item {
-        border: 1px solid #BAD6EB;
+        border: 1px solid var(--data-3);
         border-radius: 8px;
         padding: 20px;
         margin-bottom: 15px;
         transition: all 0.3s ease;
         cursor: pointer;
-        background: #F7F2EB;
+        background: var(--paper);
 
         &:hover {
-          border-color: #334EAC;
-          box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+          border-color: var(--data);
+          box-shadow: 0 4px 12px var(--accent-soft);
           transform: translateY(-2px);
         }
 
@@ -1013,7 +1016,7 @@ onMounted(() => {
 
               .device-name {
                 font-weight: 600;
-                color: #081F5C;
+                color: var(--ink);
                 font-size: 14px;
                 line-height: 1.4;
               }
@@ -1027,33 +1030,33 @@ onMounted(() => {
                   width: 14px;
                   height: 14px;
                   border-radius: 50%;
-                  border: 2px solid #F7F2EB;
+                  border: 2px solid var(--paper);
                   box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 
                   &.light-off {
-                    background: #BAD6EB;
+                    background: var(--data-3);
                   }
 
                   &.light-green {
-                    background: #7096D1;
-                    box-shadow: 0 0 12px rgba(103, 194, 58, 0.4);
+                    background: var(--data);
+                    box-shadow: 0 0 12px var(--accent-soft);
                   }
 
                   &.light-yellow {
-                    background: #7096D1;
-                    box-shadow: 0 0 12px rgba(230, 162, 60, 0.4);
+                    background: var(--warn);
+                    box-shadow: 0 0 12px var(--warn-soft);
                   }
 
                   &.light-red {
-                    background: #081F5C;
-                    box-shadow: 0 0 12px rgba(245, 108, 108, 0.4);
+                    background: var(--alarm);
+                    box-shadow: 0 0 12px var(--alarm-soft);
                   }
                 }
 
                 .status-text {
                   font-size: 12px;
                   font-weight: 500;
-                  color: #334EAC;
+                  color: var(--data);
                 }
               }
             }
@@ -1076,7 +1079,7 @@ onMounted(() => {
 
                   .label {
                     font-size: 13px;
-                    color: #7096D1;
+                    color: var(--data-2);
                   }
 
                   .value {
@@ -1084,19 +1087,19 @@ onMounted(() => {
                     font-weight: 600;
                     
                     &.status-off {
-                      color: #BAD6EB;
+                      color: var(--data-3);
                     }
                     
                     &.status-normal {
-                      color: #7096D1;
+                      color: var(--data-2);
                     }
                     
                     &.status-warning {
-                      color: #7096D1;
+                      color: var(--data-2);
                     }
                     
                     &.status-error {
-                      color: #081F5C;
+                      color: var(--ink);
                     }
                   }
                 }
@@ -1124,7 +1127,7 @@ onMounted(() => {
 
               .device-name {
                 font-weight: 600;
-                color: #081F5C;
+                color: var(--ink);
                 font-size: 14px;
               }
             }
@@ -1149,17 +1152,17 @@ onMounted(() => {
                     width: 16px;
                     height: 16px;
                     border-radius: 50%;
-                    border: 2px solid #F7F2EB;
+                    border: 2px solid var(--paper);
                     box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
                     transition: all 0.3s ease;
 
                     &.status-active {
-                      background: #7096D1;
-                      box-shadow: 0 0 12px rgba(103, 194, 58, 0.4), 0 0 0 1px rgba(0,0,0,0.1);
+                      background: var(--data-2);
+                      box-shadow: 0 0 12px var(--accent-soft), 0 0 0 1px rgba(0,0,0,0.1);
                     }
 
                     &.status-inactive {
-                      background: #BAD6EB;
+                      background: var(--data-3);
                       box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
                     }
                   }
@@ -1168,7 +1171,7 @@ onMounted(() => {
                 .status-label {
                   font-size: 14px;
                   font-weight: 600;
-                  color: #081F5C;
+                  color: var(--ink);
                 }
               }
 
@@ -1185,20 +1188,20 @@ onMounted(() => {
 
                   .label {
                     font-size: 12px;
-                    color: #7096D1;
+                    color: var(--data-2);
                   }
 
                   .value {
                     font-size: 12px;
                     font-weight: 600;
-                    color: #081F5C;
+                    color: var(--ink);
 
                     &.digital-value {
                       font-family: 'Courier New', monospace;
-                      background: #F7F2EB;
+                      background: var(--paper);
                       padding: 2px 6px;
                       border-radius: 4px;
-                      border: 1px solid #BAD6EB;
+                      border: 1px solid var(--data-3);
                     }
                   }
                 }
@@ -1215,7 +1218,7 @@ onMounted(() => {
         justify-content: space-between;
         align-items: center;
         padding: 15px;
-        border: 1px solid #BAD6EB;
+        border: 1px solid var(--data-3);
         border-radius: 6px;
         margin-bottom: 10px;
 
@@ -1227,7 +1230,7 @@ onMounted(() => {
 
           .device-name {
             font-weight: 500;
-            color: #081F5C;
+            color: var(--ink);
           }
 
           .indicator-status {
@@ -1241,22 +1244,22 @@ onMounted(() => {
               border-radius: 50%;
 
               &.light-off {
-                background: #BAD6EB;
+                background: var(--data-3);
               }
 
               &.light-green {
-                background: #7096D1;
-                box-shadow: 0 0 8px rgba(103, 194, 58, 0.5);
+                background: var(--data);
+                box-shadow: 0 0 8px var(--accent-soft);
               }
 
               &.light-yellow {
-                background: #7096D1;
-                box-shadow: 0 0 8px rgba(230, 162, 60, 0.5);
+                background: var(--warn);
+                box-shadow: 0 0 8px var(--warn-soft);
               }
 
               &.light-red {
-                background: #081F5C;
-                box-shadow: 0 0 8px rgba(245, 108, 108, 0.5);
+                background: var(--alarm);
+                box-shadow: 0 0 8px var(--alarm-soft);
               }
             }
           }
@@ -1271,7 +1274,7 @@ onMounted(() => {
         .indicator-stats,
         .io-stats {
           font-size: 14px;
-          color: #7096D1;
+          color: var(--data-2);
         }
       }
     }
