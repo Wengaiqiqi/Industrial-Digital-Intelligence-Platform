@@ -171,7 +171,6 @@ start_services.bat
 - Flask 后端 API
 - 工业设备仿真器
 - Modbus TCP 仿真器
-- 机器学习服务
 - Vue 前端服务
 
 ### 3. 访问系统
@@ -227,12 +226,8 @@ npm run dev
 | GET | `/api/devices/realtime` | 获取实时设备数据 |
 | GET | `/api/devices/status` | 获取设备状态列表 |
 | GET | `/api/devices/<device_name>/history` | 查询设备历史数据 |
-| GET | `/api/devices/<device_name>/data` | 查询设备采样数据 |
-| GET | `/api/devices/<device_name>/latest` | 获取设备最新数据 |
 | GET | `/api/devices/<device_name>/statistics` | 获取设备统计信息 |
-| GET | `/api/devices/categories` | 获取设备分类 |
 | POST | `/api/devices` | 新增设备 |
-| PUT | `/api/devices/<device_name>` | 更新设备 |
 | DELETE | `/api/devices/<device_name>` | 删除设备 |
 | POST | `/api/control/device` | 发送设备控制命令 |
 
@@ -255,12 +250,8 @@ npm run dev
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/ml/anomaly/<device_name>` | 获取异常检测结果 |
-| GET | `/api/ml/prediction/<device_name>` | 获取故障预测结果 |
 | POST | `/api/ml/analyze/<device_name>` | 综合分析设备状态 |
 | POST | `/api/ml/train` | 训练机器学习模型 |
-| POST | `/api/ml/predict/<device_name>` | 预测设备故障风险 |
-| POST | `/api/ml/detect-anomaly/<device_name>` | 检测设备异常 |
 
 ## 页面功能
 

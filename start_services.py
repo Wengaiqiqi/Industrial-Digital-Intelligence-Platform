@@ -142,12 +142,6 @@ class WindowsServiceManager:
                 'cwd': self.base_dir / 'simulator',
                 'delay': 2,
                 'retry_count': 2
-            },
-            {
-                'name': '机器学习服务',
-                'cmd': [sys.executable, 'ml_service.py'],
-                'cwd': self.base_dir / 'ml_models',
-                'delay': 2
             }
         ]
         

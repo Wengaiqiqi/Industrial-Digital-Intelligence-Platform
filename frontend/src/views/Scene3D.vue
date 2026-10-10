@@ -407,7 +407,6 @@ import { ArrowDown, Plus } from '@element-plus/icons-vue'
 import { ModelLoader } from '../utils/ModelLoader.js'
 import { DeviceDataManager } from '../utils/DeviceDataManager.js'
 import { MQTTDataIntegrator } from '../utils/MQTTDataIntegrator.js'
-import { DeviceManager } from '../utils/DeviceManager.js'
 import { ModelBuilder } from '../utils/ModelBuilder.js'
 // 模型导入相关
 const fileInput = ref(null)

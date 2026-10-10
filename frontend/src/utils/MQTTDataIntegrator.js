@@ -144,14 +144,6 @@ export class MQTTDataIntegrator {
         return formattedData;
     }
 
-    // 获取绑定状态
-    getBindingStatus() {
-        return {
-            connected: this.isConnected,
-            boundDevices: Array.from(this.deviceBindings.keys())
-        };
-    }
-
     // 清除所有绑定
     clearAllBindings() {
         this.deviceBindings.clear();

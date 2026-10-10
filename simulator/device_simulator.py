@@ -2,7 +2,7 @@
 """
 工业设备仿真器
 模拟风扇、温度传感器、伺服电机、指示灯、IO设备、PLC等工业设备
-支持MQTT和Modbus TCP通信协议
+通过MQTT发布设备数据（Modbus TCP 由 modbus_server.py 提供）
 """
 
 import random
@@ -12,16 +12,6 @@ import json
 import math
 from datetime import datetime
 import paho.mqtt.client as mqtt
-from pymodbus.server import StartTcpServer
-# ModbusDeviceIdentification在新版本中可能不可用，使用可选导入
-try:
-    from pymodbus import ModbusDeviceIdentification
-except ImportError:
-    try:
-        from pymodbus.device import ModbusDeviceIdentification
-    except ImportError:
-        ModbusDeviceIdentification = None
-from pymodbus.datastore import ModbusSequentialDataBlock, ModbusServerContext
 from loguru import logger
 
 class IndustrialDeviceSimulator:

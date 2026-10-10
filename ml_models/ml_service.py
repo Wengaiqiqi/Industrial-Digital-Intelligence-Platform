@@ -16,6 +16,13 @@ from datetime import datetime, timedelta
 from loguru import logger
 import sqlite3
 
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'industrial.db')
+
+
+def parse_timestamp(timestamp_series):
+    """解析混合格式的时间戳（ISO8601、带/不带毫秒等）"""
+    return pd.to_datetime(timestamp_series, format='mixed')
+
 class AnomalyDetector:
     """异常检测模型"""
     
@@ -56,7 +63,7 @@ class AnomalyDetector:
             logger.info("开始训练异常检测模型...")
             
             # 数据预处理 - 智能解析时间戳
-            data['timestamp'] = self._parse_timestamp(data['timestamp'])
+            data['timestamp'] = parse_timestamp(data['timestamp'])
             features = self.prepare_features(data)
             
             # 标准化
@@ -115,7 +122,7 @@ class AnomalyDetector:
                 # 单个数据点
                 data = pd.DataFrame([data])
             
-            data['timestamp'] = self._parse_timestamp(data['timestamp'])
+            data['timestamp'] = parse_timestamp(data['timestamp'])
             features = self.prepare_features(data)
             features_scaled = self.scaler.transform(features)
             
@@ -173,26 +180,6 @@ class AnomalyDetector:
             logger.error(f"加载模型失败: {e}")
             return False
 
-    def _parse_timestamp(self, timestamp_series):
-        """智能解析时间戳，支持多种格式"""
-        try:
-            # 首先尝试使用 ISO8601 格式
-            return pd.to_datetime(timestamp_series, format='ISO8601')
-        except:
-            try:
-                # 尝试混合格式推断
-                return pd.to_datetime(timestamp_series, format='mixed')
-            except:
-                try:
-                    # 尝试包含毫秒的格式
-                    return pd.to_datetime(timestamp_series, format='%Y-%m-%d %H:%M:%S.%f')
-                except:
-                    try:
-                        # 回退到标准格式
-                        return pd.to_datetime(timestamp_series, format='%Y-%m-%d %H:%M:%S')
-                    except:
-                        # 最后使用自动推断
-                        return pd.to_datetime(timestamp_series, infer_datetime_format=True)
 
 class PredictiveMaintenanceModel:
     """预测性维护模型"""
@@ -223,7 +210,7 @@ class PredictiveMaintenanceModel:
     def train(self, data):
         try:
             logger.info("开始训练LSTM预测模型...")
-            data['timestamp'] = self._parse_timestamp(data['timestamp'])
+            data['timestamp'] = parse_timestamp(data['timestamp'])
             X, y = self.prepare_sequences(data)
             if len(X) == 0:
                 logger.warning("没有足够的数据进行训练")
@@ -249,7 +236,7 @@ class PredictiveMaintenanceModel:
         if not self.is_trained:
             return None
         try:
-            data['timestamp'] = self._parse_timestamp(data['timestamp'])
+            data['timestamp'] = parse_timestamp(data['timestamp'])
             values = data.sort_values('timestamp')['value'].values.reshape(-1, 1)
             values_scaled = self.scaler.transform(values)
             if len(values_scaled) < self.seq_len:
@@ -281,149 +268,44 @@ class PredictiveMaintenanceModel:
             logger.error(f"加载LSTM模型失败: {e}")
             return False
     
-    def _get_risk_level(self, probability):
-        """根据概率确定风险等级"""
-        if probability < 0.2:
-            return 'low'
-        elif probability < 0.5:
-            return 'medium'
-        elif probability < 0.8:
-            return 'high'
-        else:
-            return 'critical'
-    
-    def save_model(self):
-        """保存模型"""
-        try:
-            model_dir = os.path.dirname(self.model_path)
-            os.makedirs(model_dir, exist_ok=True)
-            
-            model_data = {
-                'model': self.model,
-                'scaler': self.scaler,
-                'trained_at': datetime.now().isoformat()
-            }
-            
-            joblib.dump(model_data, self.model_path)
-            logger.info(f"预测模型已保存: {self.model_path}")
-            
-        except Exception as e:
-            logger.error(f"保存模型失败: {e}")
-    
-    def load_model(self):
-        """加载模型"""
-        try:
-            if os.path.exists(self.model_path):
-                model_data = joblib.load(self.model_path)
-                self.model = model_data['model']
-                self.scaler = model_data['scaler']
-                self.is_trained = True
-                logger.info(f"预测模型已加载: {self.model_path}")
-                return True
-            else:
-                logger.warning(f"模型文件不存在: {self.model_path}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"加载模型失败: {e}")
-            return False
-
-    def _parse_timestamp(self, timestamp_series):
-        """智能解析时间戳，支持多种格式"""
-        try:
-            # 首先尝试使用 ISO8601 格式
-            return pd.to_datetime(timestamp_series, format='ISO8601')
-        except:
-            try:
-                # 尝试混合格式推断
-                return pd.to_datetime(timestamp_series, format='mixed')
-            except:
-                try:
-                    # 尝试包含毫秒的格式
-                    return pd.to_datetime(timestamp_series, format='%Y-%m-%d %H:%M:%S.%f')
-                except:
-                    try:
-                        # 回退到标准格式
-                        return pd.to_datetime(timestamp_series, format='%Y-%m-%d %H:%M:%S')
-                    except:
-                        # 最后使用自动推断
-                        return pd.to_datetime(timestamp_series, infer_datetime_format=True)
 
 class MLModelService:
     """机器学习模型服务"""
     
-    def __init__(self, db_path='../database/industrial.db'):
+    def __init__(self, db_path=DEFAULT_DB_PATH):
         self.db_path = db_path
         self.anomaly_detector = AnomalyDetector()
         self.predictive_model = PredictiveMaintenanceModel()
         
-    def load_training_data(self, days=30):
-        """从数据库加载训练数据"""
+    def load_device_data(self, device_name=None, hours=24):
+        """加载指定设备（device_name 为空时加载全部设备）的历史数据"""
         try:
-            # 连接数据库
-            conn = sqlite3.connect(self.db_path)
-            
-            # 查询最近30天的数据
+            if not os.path.exists(self.db_path):
+                logger.warning(f"数据库文件不存在: {self.db_path}")
+                return pd.DataFrame()
+
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            
+            start_date = end_date - timedelta(hours=hours)
             query = """
             SELECT device_name, device_type, value, unit, timestamp, is_anomaly, status
             FROM sensor_data
             WHERE timestamp >= ? AND timestamp <= ?
-            ORDER BY timestamp
             """
-            data = pd.read_sql_query(
-                query, 
-                conn, 
-                params=[start_date.isoformat(), end_date.isoformat()]
-            )
-            
+            params = [start_date.isoformat(), end_date.isoformat()]
+            if device_name:
+                query += " AND device_name = ?"
+                params.append(device_name)
+            query += " ORDER BY timestamp ASC"
+
+            conn = sqlite3.connect(self.db_path)
+            data = pd.read_sql_query(query, conn, params=params)
             conn.close()
-            
-            logger.info(f"加载训练数据: {len(data)} 条记录")
+
+            logger.info(f"加载设备 {device_name or '全部'} 数据: {len(data)} 条记录，时间范围: {hours} 小时")
             return data
-            
+
         except Exception as e:
-            logger.error(f"加载训练数据失败: {e}")
-            return pd.DataFrame()
-    
-    def load_all_devices_data(self, days=7, hours=None):
-        """加载所有设备的历史数据用于训练"""
-        try:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'database', 'industrial.db')
-            
-            if not os.path.exists(db_path):
-                logger.warning(f"数据库文件不存在: {db_path}")
-                return pd.DataFrame()
-            
-            conn = sqlite3.connect(db_path)
-            
-            end_date = datetime.now()
-            if hours is not None:
-                start_date = end_date - timedelta(hours=hours)
-            else:
-                start_date = end_date - timedelta(days=days)
-            
-            query = """
-            SELECT device_name, device_type, value, unit, timestamp, is_anomaly, status
-            FROM sensor_data 
-            WHERE timestamp >= ? AND timestamp <= ?
-            ORDER BY timestamp ASC
-            """
-            
-            data = pd.read_sql_query(
-                query, 
-                conn, 
-                params=[start_date.isoformat(), end_date.isoformat()]
-            )            
-            conn.close()
-            
-            logger.info(f"加载所有设备数据: {len(data)} 条记录，时间范围: {hours if hours else days} {'小时' if hours else '天'}")
-            return data
-            
-        except Exception as e:
-            logger.error(f"加载所有设备数据失败: {e}")
+            logger.error(f"加载设备数据失败: {e}")
             return pd.DataFrame()
     
     def train_models(self, device_name=None, hours=168):
@@ -437,16 +319,16 @@ class MLModelService:
             
             if data.empty or len(data) < 50:
                 logger.warning(f"设备 {device_name} 数据不足，回退使用全局数据训练")
-                data = self.load_all_devices_data(hours=hours)
+                data = self.load_device_data(hours=hours)
         else:
             # 训练全局模型
             logger.info(f"训练全局模型，使用{hours}小时数据")
-            data = self.load_all_devices_data(hours=hours)
+            data = self.load_device_data(hours=hours)
             
             # 如果数据库中没有足够的数据，尝试加载更长时间范围的数据
             if data.empty or len(data) < 100:
                 logger.info("指定时间范围数据不足，尝试加载更长时间范围的数据...")
-                data = self.load_all_devices_data(hours=hours*2)  # 双倍时间范围
+                data = self.load_device_data(hours=hours*2)  # 双倍时间范围
         
         # 只有在完全没有真实数据时才生成模拟数据
         if data.empty:
@@ -577,163 +459,6 @@ class MLModelService:
         """预测故障概率"""
         return self.predictive_model.predict_failure_probability(data)
     
-    def load_device_data(self, device_name, hours=24):
-        """加载指定设备的历史数据"""
-        try:
-            db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'database', 'industrial.db')
-            
-            if not os.path.exists(db_path):
-                logger.warning(f"数据库文件不存在: {db_path}")
-                return pd.DataFrame()
-            
-            conn = sqlite3.connect(db_path)
-            
-            end_date = datetime.now()
-            start_date = end_date - timedelta(hours=hours)
-            
-            query = """
-            SELECT device_name, device_type, value, unit, timestamp, is_anomaly, status
-            FROM sensor_data 
-            WHERE device_name = ? AND timestamp >= ? AND timestamp <= ?
-            ORDER BY timestamp ASC
-            """
-            
-            data = pd.read_sql_query(
-                query, 
-                conn, 
-                params=[device_name, start_date.isoformat(), end_date.isoformat()]
-            )
-            
-            conn.close()
-            
-            logger.info(f"加载设备 {device_name} 数据: {len(data)} 条记录")
-            return data
-            
-        except Exception as e:
-            logger.error(f"加载设备数据失败: {e}")
-            return pd.DataFrame()
-
-    def _calculate_statistics(self, data):
-        """计算数据统计信息"""
-        try:
-            if data.empty:
-                return {}
-            
-            return {
-                'count': len(data),
-                'mean': float(data['value'].mean()),
-                'std': float(data['value'].std()),
-                'min': float(data['value'].min()),
-                'max': float(data['value'].max()),
-                'median': float(data['value'].median()),
-                'anomaly_count': int(data['is_anomaly'].sum()),
-                'anomaly_rate': round(float(data['is_anomaly'].mean()) * 100),  # 转换为百分比
-                'trend': self._calculate_trend(data)
-            }
-        except Exception as e:
-            logger.error(f"计算统计信息失败: {e}")
-            return {}
-    
-    def _calculate_trend(self, data):
-        """计算数据趋势"""
-        try:
-            if len(data) < 2:
-                return 'insufficient_data'
-            
-            # 简单的线性趋势计算
-            x = np.arange(len(data))
-            y = data['value'].values
-            slope = np.polyfit(x, y, 1)[0]
-            
-            if slope > 0.1:
-                return 'increasing'
-            elif slope < -0.1:
-                return 'decreasing'
-            else:
-                return 'stable'
-        except:
-            return 'unknown'
-    
-    def _generate_recommendations(self, anomaly_result, prediction_result, statistics):
-        """生成分析建议"""
-        recommendations = []
-        
-        # 基于异常检测的建议
-        if anomaly_result and anomaly_result.get('is_anomaly'):
-            confidence = anomaly_result.get('confidence', 0)
-            if confidence > 0.8:
-                recommendations.append({
-                    'type': 'critical',
-                    'title': '检测到严重异常',
-                    'description': f'设备存在严重异常，置信度: {confidence:.2%}',
-                    'action': '建议立即检查设备状态，可能需要停机维护'
-                })
-            elif confidence > 0.5:
-                recommendations.append({
-                    'type': 'warning',
-                    'title': '检测到异常行为',
-                    'description': f'设备运行异常，置信度: {confidence:.2%}',
-                    'action': '建议加强监控，考虑预防性维护'
-                })
-        
-        # 基于故障预测的建议
-        if prediction_result:
-            risk_level = prediction_result.get('risk_level', 'unknown')
-            probability = prediction_result.get('failure_probability', 0)
-            
-            if risk_level == 'critical':
-                recommendations.append({
-                    'type': 'critical',
-                    'title': '高故障风险',
-                    'description': f'预测故障概率: {probability:.2%}',
-                    'action': '建议安排紧急维护，避免设备故障导致停产'
-                })
-            elif risk_level == 'high':
-                recommendations.append({
-                    'type': 'warning',
-                    'title': '中等故障风险',
-                    'description': f'预测故障概率: {probability:.2%}',
-                    'action': '建议在下次计划维护时重点检查此设备'
-                })
-        
-        # 基于统计分析的建议
-        if statistics:
-            anomaly_rate = statistics.get('anomaly_rate', 0)
-            trend = statistics.get('trend', 'unknown')
-            
-            if anomaly_rate > 0.1:  # 异常率超过10%
-                recommendations.append({
-                    'type': 'info',
-                    'title': '异常频率较高',
-                    'description': f'异常率: {anomaly_rate:.2%}',
-                    'action': '建议分析异常模式，优化设备参数'
-                })
-            
-            if trend == 'increasing':
-                recommendations.append({
-                    'type': 'info',
-                    'title': '数值呈上升趋势',
-                    'description': '设备参数持续上升',
-                    'action': '建议检查是否存在渐进性故障'
-                })
-            elif trend == 'decreasing':
-                recommendations.append({
-                    'type': 'info',
-                    'title': '数值呈下降趋势',
-                    'description': '设备参数持续下降',
-                    'action': '建议检查设备性能是否衰减'
-                })
-        
-        # 如果没有特殊建议，给出正常运行的建议
-        if not recommendations:
-            recommendations.append({
-                'type': 'success',
-                'title': '设备运行正常',
-                'description': '未检测到明显异常或故障风险',
-                'action': '继续按计划进行定期维护即可'
-            })
-        
-        return recommendations
 
 class MLAnalysisService:
     """机器学习分析服务 - 为前端提供智能分析功能"""
@@ -1206,30 +931,3 @@ class MLAnalysisService:
             })
         
         return recommendations
-
-if __name__ == "__main__":
-    # 测试机器学习服务
-    ml_service = MLModelService()
-    
-    # 训练模型
-    results = ml_service.train_models()
-    logger.info(f"模型训练结果: {results}")
-    
-    # 测试异常检测
-    test_data = pd.DataFrame([{
-        'device_name': 'temperature_sensor_1',
-        'device_type': 'sensor',
-        'value': 85.0,  # 异常高温
-        'unit': '°C',
-        'timestamp': datetime.now().isoformat(),
-        'is_anomaly': False,
-        'status': 'online'
-    }])
-    
-    anomaly_result = ml_service.detect_anomaly(test_data)
-    logger.info(f"异常检测结果: {anomaly_result}")
-    
-    # 测试故障预测
-    if not test_data.empty:
-        failure_result = ml_service.predict_failure_probability(test_data)
-        logger.info(f"故障预测结果: {failure_result}")

@@ -937,17 +937,4 @@ export class ModelBuilder {
         
         return group;
     }
-
-    // 获取所有可用的设备类型
-    getAvailableDeviceTypes() {
-        return [
-            { type: 'pump', name: '泵', icon: '⚙️' },
-            { type: 'tank', name: '储罐', icon: '🛢️' },
-            { type: 'heat_exchanger', name: '换热器', icon: '🔥' },
-            { type: 'valve_gate', name: '闸阀', icon: '🔧' },
-            { type: 'valve_ball', name: '球阀', icon: '⚽' },
-            { type: 'conveyor', name: '传送带', icon: '📦' },
-            { type: 'factory', name: '工厂场景', icon: '🏭' }
-        ];
-    }
 }

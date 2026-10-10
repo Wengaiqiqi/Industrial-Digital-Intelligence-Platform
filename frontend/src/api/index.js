@@ -50,21 +50,9 @@ export const deviceAPI = {
     return api.get('/devices/status')
   },
   
-  // 获取设备列表
-  getDevices() {
-    return api.get('/devices/status')
-  },
-  
   // 获取实时设备数据
   getRealtimeDevices() {
     return api.get('/devices/realtime')
-  },
-  
-  // 获取设备历史数据
-  getDeviceData(deviceName, hours = 24, limit = 1000) {
-    return api.get(`/devices/${deviceName}/data`, {
-      params: { hours, limit }
-    })
   },
   
   // 获取设备历史数据（新端点）
@@ -74,10 +62,6 @@ export const deviceAPI = {
     })
   },
   
-  // 获取设备最新数据
-  getDeviceLatest(deviceName) {
-    return api.get(`/devices/${deviceName}/latest`)
-  },
   // 控制设备
   controlDevice(deviceName, command, value) {
     return api.post('/control/device', {
@@ -102,11 +86,6 @@ export const deviceAPI = {
     return api.get(`/devices/${deviceName}/statistics`, {
       params: { hours }
     })
-  },
-
-  // 获取设备分类
-  getDeviceCategories() {
-    return api.get('/devices/categories')
   }
 }
 
@@ -139,56 +118,6 @@ export const historicalAPI = {
     }, {
       responseType: 'blob'
     })
-  }
-}
-
-export const statisticsAPI = {
-  // 获取仪表板统计数据
-  getDashboardStats() {
-    return api.get('/statistics/dashboard')
-  }
-}
-
-// 机器学习分析API
-export const mlAPI = {
-  // 分析设备数据
-  async analyzeDevice(deviceName, hours = 24) {
-    try {
-      return await api.post(`/ml/analyze/${deviceName}`, { hours })
-    } catch (error) {
-      console.error('设备分析失败:', error)
-      throw error
-    }
-  },
-
-  // 训练模型
-  async trainModels() {
-    try {
-      return await api.post('/ml/train')
-    } catch (error) {
-      console.error('模型训练失败:', error)
-      throw error
-    }
-  },
-
-  // 预测设备故障
-  async predictFailure(deviceName, hours = 24) {
-    try {
-      return await api.post(`/ml/predict/${deviceName}`, { hours })
-    } catch (error) {
-      console.error('故障预测失败:', error)
-      throw error
-    }
-  },
-
-  // 检测异常
-  async detectAnomaly(deviceName, hours = 1) {
-    try {
-      return await api.post(`/ml/detect-anomaly/${deviceName}`, { hours })
-    } catch (error) {
-      console.error('异常检测失败:', error)
-      throw error
-    }
   }
 }
 

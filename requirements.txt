@@ -19,22 +19,8 @@ tensorflow==2.13.0
 paho-mqtt==1.6.1
 pymodbus==3.5.2
 
-# Database
-psycopg2-binary==2.9.9
-
-# Charts
-matplotlib==3.7.2
-seaborn==0.12.2
-
-# Async jobs
-celery==5.3.4
-
-# API client
-requests==2.31.0
-
 # Logging
 loguru==0.7.2
 
 # Utilities
-python-dotenv==1.0.0
 schedule==1.2.0

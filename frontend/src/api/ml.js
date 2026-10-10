@@ -29,29 +29,6 @@ export const mlAPI = {  // 训练机器学习模型（使用更长超时）
   // 分析指定设备（使用标准超时）
   analyzeDevice(deviceName, hours = 24) {
     return request.post(`/ml/analyze/${deviceName}`, { hours })
-  },
-
-  // 预测设备故障（使用标准超时）
-  predictFailure(deviceName, hours = 24) {
-    return request.post(`/ml/predict/${deviceName}`, { hours })
-  },
-
-  // 检测设备异常（使用标准超时）
-  detectAnomaly(deviceName, hours = 1) {
-    return request.post(`/ml/detect-anomaly/${deviceName}`, { hours })
-  },
-
-  // 获取异常检测结果（简化版）
-  getAnomalyDetection(deviceName, hours = 24) {
-    return request.get(`/ml/anomaly/${deviceName}`, { 
-      params: { hours } 
-    })
-  },
-  // 获取故障预测结果（简化版）
-  getFailurePrediction(deviceName, hours = 168) {
-    return request.get(`/ml/prediction/${deviceName}`, { 
-      params: { hours } 
-    })
   }
 }
 

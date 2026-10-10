@@ -186,7 +186,6 @@ echo.
 echo ⚠️ 注意: 以下文件未被删除
 echo    • 源代码文件(.py, .js, .vue等)
 echo    • 配置文件(.json, .conf等)
-echo    • 安装包文件(所需安装/目录下)
 echo    • README和文档文件
 echo.
 pause

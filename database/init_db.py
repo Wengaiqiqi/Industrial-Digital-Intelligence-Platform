@@ -64,49 +64,10 @@ def create_database(db_path):
         )
         ''')
         
-        # 创建生产统计表
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS production_stats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date DATE NOT NULL,
-            total_runtime INTEGER DEFAULT 0,
-            downtime INTEGER DEFAULT 0,
-            production_count INTEGER DEFAULT 0,
-            defect_count INTEGER DEFAULT 0,
-            efficiency REAL DEFAULT 0.0,
-            energy_consumption REAL DEFAULT 0.0
-        )
-        ''')
-        
-        # 创建用户操作日志表
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS operation_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_name VARCHAR(100),
-            operation VARCHAR(100) NOT NULL,
-            target_device VARCHAR(100),
-            parameters TEXT,
-            result VARCHAR(50),
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
-        # 创建系统配置表
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS system_config (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            config_key VARCHAR(100) NOT NULL UNIQUE,
-            config_value TEXT,
-            description TEXT,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
         # 创建索引以提高查询性能
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_sensor_data_device_time ON sensor_data(device_name, timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_alarm_records_time ON alarm_records(timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_alarm_records_device ON alarm_records(device_name)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(timestamp)')
         
         # 插入初始设备状态数据
         devices = [
@@ -131,32 +92,12 @@ def create_database(db_path):
             ''', devices)
             logger.info("初始设备状态数据已插入")
         
-        # 插入系统配置
-        configs = [
-            ('data_retention_days', '90', '数据保留天数'),
-            ('alarm_threshold_temperature_high', '80', '温度高报警阈值'),
-            ('alarm_threshold_temperature_low', '5', '温度低报警阈值'),
-            ('alarm_threshold_pressure_high', '5.0', '压力高报警阈值'),
-            ('alarm_threshold_pressure_low', '0.3', '压力低报警阈值'),
-            ('model_retrain_interval_hours', '24', '模型重训练间隔（小时）'),
-            ('mqtt_broker_host', 'localhost', 'MQTT代理主机'),
-            ('mqtt_broker_port', '1883', 'MQTT代理端口'),
-            ('system_name', '工业数智平台', '系统名称'),
-            ('system_version', '1.0.0', '系统版本')
-        ]
-        
-        for config_key, config_value, description in configs:
-            cursor.execute('''
-            INSERT OR IGNORE INTO system_config (config_key, config_value, description)
-            VALUES (?, ?, ?)
-            ''', (config_key, config_value, description))
-        
         # 提交事务
         conn.commit()
         logger.info(f"数据库初始化完成: {db_path}")
         
         # 显示表统计信息
-        tables = ['sensor_data', 'device_status', 'alarm_records', 'production_stats', 'operation_logs', 'system_config']
+        tables = ['sensor_data', 'device_status', 'alarm_records']
         for table in tables:
             cursor.execute(f'SELECT COUNT(*) FROM {table}')
             count = cursor.fetchone()[0]

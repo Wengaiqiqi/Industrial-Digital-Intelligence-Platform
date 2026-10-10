@@ -231,16 +231,6 @@ export class DeviceDataManager {
         }
     }
 
-    // 获取所有设备列表
-    getAllDevices() {
-        return Array.from(this.devices.entries()).map(([id, device]) => ({
-            id,
-            name: device.config.name || id,
-            type: device.config.type,
-            data: this.deviceData.get(id) || {}
-        }));
-    }
-
     // 清理资源
     dispose() {
         if (this.tooltipElement) {
